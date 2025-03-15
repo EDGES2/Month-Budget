@@ -19,6 +19,7 @@ extension Transaction {
     @NSManaged public var amountPLN: Double
     @NSManaged public var amountUAH: Double
     @NSManaged public var category: String?
+    @NSManaged public var comment: String?
     @NSManaged public var date: Date?
     @NSManaged public var id: UUID?
 
