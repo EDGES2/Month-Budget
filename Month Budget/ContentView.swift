@@ -49,7 +49,7 @@ struct ContentView: View {
 //                InputListView()
 //                    .environmentObject(categoryDataModel)
                 // Основний контент, що відображає транзакції відповідно до обраного фільтра
-                MainContentView(selectedFilter: $selectedFilter)
+                TransactionsMainView(selectedCategoryFilter: $selectedFilter)
                     .environmentObject(categoryDataModel)
             }
             Divider()
@@ -117,12 +117,15 @@ struct CategoryFiltersView: View {
     
     /// Список категорій, відсортованих за кількістю транзакцій. Перша категорія – "Всі".
     private var sortedCategories: [String] {
-        let others = categoryDataModel.filterOptions.dropFirst().sorted { lhs, rhs in
-            let lhsCount = transactions.filter { $0.validCategory == lhs }.count
-            let rhsCount = transactions.filter { $0.validCategory == rhs }.count
-            return lhsCount > rhsCount
-        }
-        return [categoryDataModel.filterOptions.first ?? "Всі", "Поповнення"] + others
+        let others = categoryDataModel.filterOptions
+            .dropFirst()
+            .filter { $0 != "Поповнення" } // Прибираємо дублікат
+            .sorted { lhs, rhs in
+                let lhsCount = transactions.filter { $0.validCategory == lhs }.count
+                let rhsCount = transactions.filter { $0.validCategory == rhs }.count
+                return lhsCount > rhsCount
+            }
+        return [categoryDataModel.filterOptions.first ?? "Всі"] + ["Поповнення"] + others
     }
     
     var body: some View {
@@ -168,7 +171,16 @@ struct CategoryFiltersView: View {
         }
     }
 }
-
+// MARK: - ScaleButtonStyle (Стиль кнопки з ефектом масштабування)
+/// Користувацький стиль кнопки, який забезпечує ефект масштабування при натисканні.
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
 // MARK: - RenameCategoryView (Перейменування)
 /// Представлення для перейменування вибраної категорії. Дозволяє змінити назву категорії та оновити пов'язані транзакції.
 struct RenameCategoryView: View {
@@ -233,8 +245,6 @@ func renameCategory(oldName: String, newName: String, in context: NSManagedObjec
         print("Помилка оновлення транзакцій: \(error.localizedDescription)")
     }
 }
-
-
 // MARK: - CategoryManagementView (Управління категоріями)
 /// Представлення для додавання та видалення категорій. Дає можливість користувачу керувати списком категорій.
 struct CategoryManagementView: View {
@@ -320,6 +330,9 @@ struct CategoryManagementView: View {
         categoryDataModel.colors.removeValue(forKey: category)
     }
 }
+// MARK: Кінець структур для SIDEBAR
+
+
 
 // MARK: - InputListView (Компонент для введення транзакцій)
 /// Представлення для введення нових транзакцій. Містить поля для введення сум, вибору категорії та коментаря.
@@ -443,8 +456,6 @@ struct InputListView: View {
         }
     }
 }
-
-
 // MARK: - InputField (Компонент вводу)
 /// Компонент для відображення заголовку і текстового поля вводу з базовим оформленням.
 struct InputField: View {
@@ -470,31 +481,17 @@ struct InputField: View {
         }
     }
 }
-
-
-// MARK: - ScaleButtonStyle (Стиль кнопки з ефектом масштабування)
-/// Користувацький стиль кнопки, який забезпечує ефект масштабування при натисканні.
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
-    }
-}
-
-// MARK: Кінець структур для SIDEBAR
+// MARK: Кінець структур для InputListView
 
 
 
-
-// MARK: - MainContentView (Основний контент транзакцій)
+// MARK: - TransactionsMainView (Основний контент транзакцій)
 /// Представлення, яке відображає транзакції. Показує або загальний огляд витрат, або деталі конкретної категорії.
-struct MainContentView: View {
-    // Прив'язка для вибору фільтра категорії
-    @Binding var selectedFilter: String
+struct TransactionsMainView: View {
+    // Прив'язка для вибору категорії фільтрації
+    @Binding var selectedCategoryFilter: String
     // Змінна для збереження транзакції, яку потрібно редагувати
-    @State private var selectedTransaction: Transaction?
+    @State private var transactionToEdit: Transaction?
     // Доступ до контексту CoreData
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
@@ -505,7 +502,7 @@ struct MainContentView: View {
         animation: .default
     ) private var transactions: FetchedResults<Transaction>
     
-    // Фіксований місячний бюджет (може бути використаний для порівняння з витратами)
+    // Фіксований місячний бюджет (для порівняння з витратами)
     private let monthlyBudget: Double = 20000.0
     
     /// Обчислювана властивість, що повертає категорії, відсортовані за кількістю транзакцій (за спаданням)
@@ -518,7 +515,7 @@ struct MainContentView: View {
     }
     
     /// Огляд сумарних витрат для всіх транзакцій
-    private var totalSummary: some View {
+    private var totalExpensesSummary: some View {
         let totalUAH = transactions.reduce(0) { $0 + $1.amountUAH }
         let totalPLN = transactions.reduce(0) { $0 + $1.amountPLN }
         let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
@@ -533,33 +530,32 @@ struct MainContentView: View {
     }
     
     var body: some View {
-            content
-                .sheet(item: $selectedTransaction) { transaction in
-                    EditTransactionView(transaction: transaction)
-                        .environment(\.managedObjectContext, viewContext)
-                }
-        }
-    
-    /// Вибір між переглядом всіх категорій та деталями конкретної категорії
-    @ViewBuilder
-        private var content: some View {
-            if selectedFilter == "Логотип" {
-                budgetView
-            } else if selectedFilter == "Всі" {
-                allCategoriesView
-            } else {
-                categoryDetailView
+        content
+            .sheet(item: $transactionToEdit) { transaction in
+                EditTransactionView(transaction: transaction)
+                    .environment(\.managedObjectContext, viewContext)
             }
+    }
+    
+    /// Вибір між переглядом загального огляду та деталями конкретної категорії
+    @ViewBuilder
+    private var content: some View {
+        if selectedCategoryFilter == "Логотип" {
+            budgetSummaryListView
+        } else if selectedCategoryFilter == "Всі" {
+            allCategoriesSummaryView
+        } else {
+            selectedCategoryDetailsView
         }
+    }
     
     /// Представлення, що показує загальний огляд транзакцій за всіма категоріями
-    private var allCategoriesView: some View {
+    private var allCategoriesSummaryView: some View {
         List {
-
-            totalSummary
+            totalExpensesSummary
             // Відображення підсумку для кожної категорії
             ForEach(sortedCategories, id: \.self) { category in
-                CategorySummaryView(
+                CategoryExpenseSummaryView(
                     category: category,
                     transactions: transactions,
                     color: categoryDataModel.colors[category] ?? .gray
@@ -570,22 +566,22 @@ struct MainContentView: View {
     }
     
     /// Представлення, що показує деталі транзакцій для вибраної категорії
-    private var categoryDetailView: some View {
+    private var selectedCategoryDetailsView: some View {
         // Фільтрація транзакцій за вибраною категорією
-        let filteredTransactions = transactions.filter { $0.validCategory == selectedFilter }
+        let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
         return VStack {
             // Заголовок категорії з інформацією про транзакції
             CategoryHeaderView(
                 transactions: filteredTransactions,
-                color: categoryDataModel.colors[selectedFilter] ?? .gray
+                color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
             )
             List {
-                // Відображення кожної транзакції у вигляді клітинки з можливістю редагування або видалення
+                // Відображення кожної транзакції з можливістю редагування або видалення
                 ForEach(filteredTransactions, id: \.wrappedId) { transaction in
                     TransactionCell(
                         transaction: transaction,
                         color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
-                        onEdit: { selectedTransaction = transaction },
+                        onEdit: { transactionToEdit = transaction },
                         onDelete: { deleteTransaction(transaction) }
                     )
                 }
@@ -594,8 +590,9 @@ struct MainContentView: View {
         }
     }
     
-    private var budgetView: some View {
-        List{
+    /// Представлення, що показує огляд бюджету
+    private var budgetSummaryListView: some View {
+        List {
             BudgetSummaryView(
                 monthlyBudget: monthlyBudget,
                 transactions: transactions,
@@ -615,87 +612,20 @@ struct MainContentView: View {
     }
 }
 
-// MARK: - BudgetSummaryView (Підсумок бюджету)
-struct BudgetSummaryView: View {
-    let monthlyBudget: Double
+// MARK: - CategoryExpenseSummaryView (Підсумок витрат за категорією)
+struct CategoryExpenseSummaryView: View {
+    let category: String
     let transactions: FetchedResults<Transaction>
     let color: Color
-
-    private var totalExpensesUAH: Double { transactions.reduce(0) { $0 + $1.amountUAH } }
-    private var totalExpensesPLN: Double { transactions.reduce(0) { $0 + $1.amountPLN } }
-    private var averageRate: Double { totalExpensesPLN != 0 ? totalExpensesUAH / totalExpensesPLN : 0.0 }
-    private var finalBalanceUAH: Double { monthlyBudget - totalExpensesUAH }
-    private var finalBalancePLN: Double { averageRate != 0 ? finalBalanceUAH / averageRate : 0.0 }
-
+    
     var body: some View {
-        VStack(spacing: 4) {
-            HStack {
-                Spacer()
-                Text("Категорія")
-                    .bold()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("UAH")
-                    .bold()
-                    .frame(maxWidth: 100, alignment: .trailing)
-                Text("PLN")
-                    .bold()
-                    .frame(maxWidth: 100, alignment: .trailing)
-                Text("Курс")
-                    .bold()
-                    .frame(maxWidth: 80, alignment: .trailing)
-                Spacer()
-            }
-            .font(.system(size: 16, design: .monospaced))
-            .padding(.vertical, 6)
-            .background(Color.gray.opacity(0.2))
-            Divider()
-            rowView(label: "Бюджет:", amountUAH: monthlyBudget, amountPLN: nil, rate: nil)
-            rowView(label: "Баланс:", amountUAH: finalBalanceUAH, amountPLN: finalBalancePLN, rate: averageRate)
-        }
-        .padding(.vertical)
-        .background(color.opacity(0.2))
-        .cornerRadius(12)
-    }
-    
-    @ViewBuilder
-    private func rowView(label: String, amountUAH: Double?, amountPLN: Double?, rate: Double?) -> some View {
-        HStack {
-            Spacer()
-            Text(label)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(amountUAH != nil ? "\(amountUAH!, format: .number.precision(.fractionLength(2)))" : "-")
-                .frame(maxWidth: 100, alignment: .trailing)
-            Text(amountPLN != nil ? "\(amountPLN!, format: .number.precision(.fractionLength(2)))" : "-")
-                .frame(maxWidth: 100, alignment: .trailing)
-            Text(rate != nil ? "\(rate!, format: .number.precision(.fractionLength(2)))" : "-")
-                .frame(maxWidth: 80, alignment: .trailing)
-            Spacer()
-        }
-        .font(.system(size: 14, design: .monospaced))
+        let sumUAH = transactions.filter { $0.validCategory == category }.reduce(0) { $0 + $1.amountUAH }
+        let sumPLN = transactions.filter { $0.validCategory == category }.reduce(0) { $0 + $1.amountPLN }
+        let rate = sumPLN != 0 ? sumUAH / sumPLN : 0.0
+        
+        SummaryView(title: category, amountUAH: sumUAH, amountPLN: sumPLN, rate: rate, color: color)
     }
 }
-
-    
-
-// MARK: - Text Extension для стилізації кнопок категорій
-extension Text {
-    func categoryButtonStyle(isSelected: Bool, color: Color) -> some View {
-        self
-            .font(.system(size: 14, weight: .medium))
-            .foregroundColor(isSelected ? (color == Color(red: 0.9, green: 0.9, blue: 0.9) ? .black : .white) : .primary)
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-            .background(color.opacity(isSelected ? 1.0 : 0.2))
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(color.opacity(0.8), lineWidth: isSelected ? 2 : 1)
-            )
-            .shadow(color: color.opacity(isSelected ? 0.3 : 0.2), radius: isSelected ? 4 : 2, x: 0, y: isSelected ? 2 : 1)
-            .contentShape(Rectangle())
-    }
-}
-
 
 // MARK: - SummaryView (Загальний підсумок витрат)
 struct SummaryView: View {
@@ -727,7 +657,6 @@ struct SummaryView: View {
         .padding(.vertical, 4)
     }
 }
-
 
 // MARK: - EditTransactionView (Редагування транзакції)
 /// Представлення для редагування існуючої транзакції. Дозволяє змінювати суму, категорію та коментар.
@@ -779,11 +708,19 @@ struct EditTransactionView: View {
         .navigationTitle("Редагування")
         .toolbar {
             #if os(iOS)
-            ToolbarItem(placement: .navigationBarLeading) { Button("Скасувати") { closeView() } }
-            ToolbarItem(placement: .navigationBarTrailing) { Button("Зберегти") { saveChanges() } }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Скасувати") { closeView() }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Зберегти") { saveChanges() }
+            }
             #else
-            ToolbarItem(placement: .cancellationAction) { Button("Скасувати") { closeView() } }
-            ToolbarItem(placement: .confirmationAction) { Button("Зберегти") { saveChanges() } }
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Скасувати") { closeView() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Зберегти") { saveChanges() }
+            }
             #endif
         }
     }
@@ -855,21 +792,6 @@ struct EditTransactionView: View {
     }
 }
 
-// MARK: - CategorySummaryView (Підсумок витрат за категорією)
-struct CategorySummaryView: View {
-    let category: String
-    let transactions: FetchedResults<Transaction>
-    let color: Color
-    
-    var body: some View {
-        let sumUAH = transactions.filter { $0.validCategory == category }.reduce(0) { $0 + $1.amountUAH }
-        let sumPLN = transactions.filter { $0.validCategory == category }.reduce(0) { $0 + $1.amountPLN }
-        let rate = sumPLN != 0 ? sumUAH / sumPLN : 0.0
-        
-        SummaryView(title: category, amountUAH: sumUAH, amountPLN: sumPLN, rate: rate, color: color)
-    }
-}
-
 // MARK: - CategoryHeaderView (Заголовок категорії)
 struct CategoryHeaderView: View {
     let transactions: [Transaction]
@@ -890,7 +812,6 @@ struct CategoryHeaderView: View {
         .cornerRadius(8)
     }
 }
-
 
 // MARK: - TransactionCell (Ячейка транзакції)
 struct TransactionCell: View {
@@ -942,9 +863,88 @@ struct TransactionCell: View {
     }
 }
 
-// MARK: - Допоміжні компоненти та розширення
+// MARK: - BudgetSummaryView (Підсумок бюджету)
+struct BudgetSummaryView: View {
+    let monthlyBudget: Double
+    let transactions: FetchedResults<Transaction>
+    let color: Color
 
+    private var totalExpensesUAH: Double { transactions.reduce(0) { $0 + $1.amountUAH } }
+    private var totalExpensesPLN: Double { transactions.reduce(0) { $0 + $1.amountPLN } }
+    private var averageRate: Double { totalExpensesPLN != 0 ? totalExpensesUAH / totalExpensesPLN : 0.0 }
+    private var finalBalanceUAH: Double { monthlyBudget - totalExpensesUAH }
+    private var finalBalancePLN: Double { averageRate != 0 ? finalBalanceUAH / averageRate : 0.0 }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Spacer()
+                Text("Категорія")
+                    .bold()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("UAH")
+                    .bold()
+                    .frame(maxWidth: 100, alignment: .trailing)
+                Text("PLN")
+                    .bold()
+                    .frame(maxWidth: 100, alignment: .trailing)
+                Text("Курс")
+                    .bold()
+                    .frame(maxWidth: 80, alignment: .trailing)
+                Spacer()
+            }
+            .font(.system(size: 16, design: .monospaced))
+            .padding(.vertical, 6)
+            .background(Color.gray.opacity(0.2))
+            Divider()
+            rowView(label: "Бюджет:", amountUAH: monthlyBudget, amountPLN: nil, rate: nil)
+            rowView(label: "Баланс:", amountUAH: finalBalanceUAH, amountPLN: finalBalancePLN, rate: averageRate)
+        }
+        .padding(.vertical)
+        .background(color.opacity(0.2))
+        .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private func rowView(label: String, amountUAH: Double?, amountPLN: Double?, rate: Double?) -> some View {
+        HStack {
+            Spacer()
+            Text(label)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(amountUAH != nil ? "\(amountUAH!, format: .number.precision(.fractionLength(2)))" : "-")
+                .frame(maxWidth: 100, alignment: .trailing)
+            Text(amountPLN != nil ? "\(amountPLN!, format: .number.precision(.fractionLength(2)))" : "-")
+                .frame(maxWidth: 100, alignment: .trailing)
+            Text(rate != nil ? "\(rate!, format: .number.precision(.fractionLength(2)))" : "-")
+                .frame(maxWidth: 80, alignment: .trailing)
+            Spacer()
+        }
+        .font(.system(size: 14, design: .monospaced))
+    }
+}
+
+
+
+// MARK: - Допоміжні компоненти та розширення
 extension Transaction {
     var wrappedId: UUID { id ?? UUID() }
     var validCategory: String { category ?? "Інше" }
+}
+// MARK: - Text Extension для стилізації кнопок категорій
+extension Text {
+    func categoryButtonStyle(isSelected: Bool, color: Color) -> some View {
+        self
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(isSelected ? (color == Color(red: 0.9, green: 0.9, blue: 0.9) ? .black : .white) : .primary)
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            .background(color.opacity(isSelected ? 1.0 : 0.2))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(color.opacity(0.8), lineWidth: isSelected ? 2 : 1)
+            )
+            .shadow(color: color.opacity(isSelected ? 0.3 : 0.2), radius: isSelected ? 4 : 2, x: 0, y: isSelected ? 2 : 1)
+            .contentShape(Rectangle())
+    }
 }
