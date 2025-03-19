@@ -9,7 +9,7 @@ final class CategoryDataModel: ObservableObject {
     @Published var filterOptions: [String] = [
         "Всі", "Поповнення", "Їжа", "Проживання", "Здоровʼя та краса",
         "Інтернет послуги", "Транспорт", "Розваги та спорт",
-        "Приладдя для дому", "Благо", "Електроніка", "Інше"
+        "Приладдя для дому", "Благо", "Електроніка","На інший рахунок", "Інше"
     ]
     
     /// Словник відповідності категорій і кольорів, який використовується для стилізації UI.
@@ -25,13 +25,14 @@ final class CategoryDataModel: ObservableObject {
         "Приладдя для дому": Color(red: 0.5, green: 0.5, blue: 0.5),
         "Благо": Color(red: 0.74, green: 0.98, blue: 0.79),
         "Електроніка": Color(red: 0.0, green: 0.5, blue: 0.5),
+        "На інший рахунок": Color(red: 0.7, green: 0.2, blue: 0.3),
         "Інше": Color(red: 0.29, green: 0.0, blue: 0.51)
     ]
 }
 
 // MARK: - MainAppView (Головний вигляд додатку)
 /// Основне представлення додатку, яке складається з бокової панелі та основного контенту.
-struct ContentView: View {
+struct MainAppView: View {
     /// Змінна для збереження обраного фільтра категорій.
     @State private var selectedCategoryFilter = "Всі"
     /// Створення спостережуваного об'єкту для моделі даних категорій.
@@ -448,45 +449,25 @@ struct InputField: View {
 // MARK: - TransactionsMainView (Основний контент транзакцій)
 /// Представлення, яке відображає транзакції. Показує або загальний огляд витрат, або деталі конкретної категорії.
 struct TransactionsMainView: View {
-    // Прив'язка для вибору категорії фільтрації
     @Binding var selectedCategoryFilter: String
-    // Змінна для збереження транзакції, яку потрібно редагувати
     @State private var transactionToEdit: Transaction?
-    // Доступ до контексту CoreData
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
-    
-    // Отримання даних транзакцій із CoreData, відсортованих за датою
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)],
         animation: .default
     ) private var transactions: FetchedResults<Transaction>
     
-    // Фіксований місячний бюджет (для порівняння з витратами)
     private let monthlyBudget: Double = 20000.0
     
-    /// Обчислювана властивість, що повертає категорії, відсортовані за кількістю транзакцій (за спаданням)
+    // Отримуємо категорії, відсортовані за кількістю транзакцій
     private var sortedCategories: [String] {
-        categoryDataModel.filterOptions.dropFirst().sorted { lhs, rhs in
+        categoryDataModel.filterOptions.dropFirst().filter { $0 != "Поповнення" }.sorted { lhs, rhs in
             let lhsCount = transactions.filter { $0.validCategory == lhs }.count
             let rhsCount = transactions.filter { $0.validCategory == rhs }.count
             return lhsCount > rhsCount
         }
-    }
-    
-    /// Огляд сумарних витрат для всіх транзакцій
-    private var totalExpensesSummary: some View {
-        let totalUAH = transactions.reduce(0) { $0 + $1.amountUAH }
-        let totalPLN = transactions.reduce(0) { $0 + $1.amountPLN }
-        let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
-        
-        return SummaryView(
-            title: "Усі витрати",
-            amountUAH: totalUAH,
-            amountPLN: totalPLN,
-            rate: rate,
-            color: categoryDataModel.colors["Всі"] ?? .gray
-        )
     }
     
     var body: some View {
@@ -497,23 +478,36 @@ struct TransactionsMainView: View {
             }
     }
     
-    /// Вибір між переглядом загального огляду та деталями конкретної категорії
     @ViewBuilder
     private var content: some View {
         if selectedCategoryFilter == "Логотип" {
             budgetSummaryListView
         } else if selectedCategoryFilter == "Всі" {
             allCategoriesSummaryView
-        } else {
+        } else if selectedCategoryFilter == "Поповнення" {
+            totalRepliesSummaryView
+        }else {
             selectedCategoryDetailsView
         }
     }
-    
-    /// Представлення, що показує загальний огляд транзакцій за всіма категоріями
+    private var budgetSummaryListView: some View {
+        VStack {
+            TransactionInputView()
+                .environmentObject(categoryDataModel)
+            List {
+                BudgetSummaryView(
+                    monthlyBudget: monthlyBudget,
+                    transactions: transactions,
+                    color: categoryDataModel.colors["Всі"] ?? .gray
+                )
+            }
+        }
+    }
+    // Список для категорії "Всі"
     private var allCategoriesSummaryView: some View {
         List {
             totalExpensesSummary
-            // Відображення підсумку для кожної категорії
+            replenishmentSummary
             ForEach(sortedCategories, id: \.self) { category in
                 CategoryExpenseSummaryView(
                     category: category,
@@ -524,19 +518,33 @@ struct TransactionsMainView: View {
         }
         .listStyle(PlainListStyle())
     }
-    
-    /// Представлення, що показує деталі транзакцій для вибраної категорії
-    private var selectedCategoryDetailsView: some View {
-        // Фільтрація транзакцій за вибраною категорією
+    private var totalRepliesSummaryView: some View {
         let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
         return VStack {
-            // Заголовок категорії з інформацією про транзакції
+            ReplenishmentHeaderView(
+                transactions: filteredTransactions,
+                color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
+            )
+            List {
+                ForEach(filteredTransactions, id: \.wrappedId) { transaction in
+                    TransactionCell(
+                        transaction: transaction,
+                        color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
+                        onEdit: { transactionToEdit = transaction },
+                        onDelete: { deleteTransaction(transaction) }
+                    )
+                }
+            }
+        }
+    }
+    private var selectedCategoryDetailsView: some View {
+        let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
+        return VStack {
             CategoryHeaderView(
                 transactions: filteredTransactions,
                 color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
             )
             List {
-                // Відображення кожної транзакції з можливістю редагування або видалення
                 ForEach(filteredTransactions, id: \.wrappedId) { transaction in
                     TransactionCell(
                         transaction: transaction,
@@ -549,19 +557,37 @@ struct TransactionsMainView: View {
             .listStyle(PlainListStyle())
         }
     }
-    
-    /// Представлення, що показує огляд бюджету
-    private var budgetSummaryListView: some View {
-        List {
-            BudgetSummaryView(
-                monthlyBudget: monthlyBudget,
-                transactions: transactions,
-                color: categoryDataModel.colors["Всі"] ?? .gray
-            )
-        }
+    /// Огляд "Усі витрати" (без транзакцій "Поповнення")
+    private var totalExpensesSummary: some View {
+        let expenses = transactions.filter { $0.validCategory != "Поповнення" && $0.validCategory != "На інший рахунок"}
+        let totalUAH = expenses.reduce(0) { $0 + $1.amountUAH }
+        let totalPLN = expenses.reduce(0) { $0 + $1.amountPLN }
+        let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
+
+        return SummaryView(
+            title: "Усі витрати",
+            amountUAH: totalUAH,
+            amountPLN: totalPLN,
+            rate: rate,
+            color: categoryDataModel.colors["Всі"] ?? .gray
+        )
     }
     
-    /// Функція для видалення транзакції з контексту CoreData
+    /// Огляд для категорії "Поповнення"
+    private var replenishmentSummary: some View {
+        let replenishments = transactions.filter { $0.validCategory == "Поповнення" }
+        let totalUAH = replenishments.reduce(0) { $0 + $1.amountUAH }
+        let totalPLN = replenishments.reduce(0) { $0 + $1.amountPLN }
+        let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
+        
+        return SummaryView(
+            title: "Поповнення",
+            amountUAH: totalUAH,
+            amountPLN: totalPLN,
+            rate: rate,
+            color: categoryDataModel.colors["Поповнення"] ?? .gray
+        )
+    }
     private func deleteTransaction(_ transaction: Transaction) {
         viewContext.delete(transaction)
         do {
@@ -571,6 +597,7 @@ struct TransactionsMainView: View {
         }
     }
 }
+
 
 // MARK: - CategoryExpenseSummaryView (Підсумок витрат за категорією)
 struct CategoryExpenseSummaryView: View {
@@ -705,7 +732,7 @@ struct EditTransactionView: View {
                 .font(.headline)
             Picker("Категорія", selection: $selectedCategory) {
                 // Використання динамічного списку категорій (крім "Всі")
-                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" }, id: \.self) { category in
+                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення"}, id: \.self) { category in
                     Text(category)
                 }
             }
@@ -772,7 +799,23 @@ struct CategoryHeaderView: View {
         .cornerRadius(8)
     }
 }
-
+// MARK: - ReplenishmentHeaderView (Заголовок для категорії "Поповнення")
+struct ReplenishmentHeaderView: View {
+    let transactions: [Transaction]
+    let color: Color
+    
+    var body: some View {
+        // Розрахунок загальної суми поповнень в UAH
+        let totalUAH = transactions.reduce(0) { $0 + $1.amountUAH }
+        
+        VStack(spacing: 8) {
+            Text("Загальна сума поповнень в UAH: \(totalUAH, format: .number.precision(.fractionLength(2)))")
+        }
+        .padding()
+        .background(color.opacity(0.2))
+        .cornerRadius(8)
+    }
+}
 // MARK: - TransactionCell (Ячейка транзакції)
 struct TransactionCell: View {
     let transaction: Transaction
@@ -829,17 +872,48 @@ struct BudgetSummaryView: View {
     let transactions: FetchedResults<Transaction>
     let color: Color
 
-    private var totalExpensesUAH: Double { transactions.reduce(0) { $0 + $1.amountUAH } }
-    private var totalExpensesPLN: Double { transactions.reduce(0) { $0 + $1.amountPLN } }
-    private var averageRate: Double { totalExpensesPLN != 0 ? totalExpensesUAH / totalExpensesPLN : 0.0 }
-    private var finalBalanceUAH: Double { monthlyBudget - totalExpensesUAH }
-    private var finalBalancePLN: Double { averageRate != 0 ? finalBalanceUAH / averageRate : 0.0 }
+    // Початковий баланс – може бути заданим константою або отриманим із налаштувань
+    private let initialBalance: Double = 30165.86
 
+    // Загальні витрати (без "Поповнення")
+    private var totalExpensesUAH: Double {
+        transactions.filter { $0.validCategory != "Поповнення" && $0.validCategory != "На інший рахунок"  }
+            .reduce(0) { $0 + $1.amountUAH }
+    }
+    private var totalExpensesPLN: Double {
+        transactions.filter { $0.validCategory != "Поповнення" && $0.validCategory != "На інший рахунок" }
+            .reduce(0) { $0 + $1.amountPLN }
+    }
+    
+    // Сума поповнень (тільки категорія "Поповнення")
+    private var totalReplenishmentUAH: Double {
+        transactions.filter { $0.validCategory == "Поповнення" }
+            .reduce(0) { $0 + $1.amountUAH }
+    }
+    private var totalReplenishmentPLN: Double {
+        transactions.filter { $0.validCategory == "Поповнення" }
+            .reduce(0) { $0 + $1.amountPLN }
+    }
+    
+    // Розрахунок середнього курсу (для прикладу використовується розрахунок за витратами)
+    private var averageRate: Double {
+        totalExpensesPLN != 0 ? totalExpensesUAH / totalExpensesPLN : 0.0
+    }
+    
+    // "Залишок очікуваний" = Бюджет - всі витрати (без поповнень)
+    private var expectedBalanceUAH: Double { monthlyBudget - totalExpensesUAH }
+    private var expectedBalancePLN: Double { averageRate != 0 ? expectedBalanceUAH / averageRate : 0.0 }
+    
+    // "Залишок фактичний" = Початковий баланс + поповнення - всі витрати (без поповнень)
+    private var actualBalanceUAH: Double { initialBalance + totalReplenishmentUAH - totalExpensesUAH }
+    private var actualBalancePLN: Double { averageRate != 0 ? actualBalanceUAH / averageRate : 0.0 }
+    
     var body: some View {
         VStack(spacing: 4) {
+            // Заголовок таблиці
             HStack {
                 Spacer()
-                Text("Категорія")
+                Text("Показники")
                     .bold()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("UAH")
@@ -857,8 +931,14 @@ struct BudgetSummaryView: View {
             .padding(.vertical, 6)
             .background(Color.gray.opacity(0.2))
             Divider()
+            // Рядок "Бюджет" (відображає встановлений місячний бюджет)
             rowView(label: "Бюджет:", amountUAH: monthlyBudget, amountPLN: nil, rate: nil)
-            rowView(label: "Баланс:", amountUAH: finalBalanceUAH, amountPLN: finalBalancePLN, rate: averageRate)
+            // Рядок "Початковий баланс"
+            rowView(label: "Початковий баланс:", amountUAH: initialBalance, amountPLN: nil, rate: nil)
+            // Рядок "Залишок очікуваний" (раніше "Баланс")
+            rowView(label: "Залишок очікуваний:", amountUAH: expectedBalanceUAH, amountPLN: expectedBalancePLN, rate: averageRate)
+            // Рядок "Залишок фактичний"
+            rowView(label: "Залишок фактичний:", amountUAH: actualBalanceUAH, amountPLN: actualBalancePLN, rate: averageRate)
         }
         .padding(.vertical)
         .background(color.opacity(0.2))
