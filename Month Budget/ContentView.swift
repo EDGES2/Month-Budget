@@ -29,27 +29,25 @@ final class CategoryDataModel: ObservableObject {
     ]
 }
 
-// MARK: - ContentView (Головний вигляд додатку)
+// MARK: - MainAppView (Головний вигляд додатку)
 /// Основне представлення додатку, яке складається з бокової панелі та основного контенту.
 struct ContentView: View {
-    // Змінна для збереження обраного фільтра категорій.
-    @State private var selectedFilter = "Всі"
-    // Створення спостережуваного об'єкту для моделі даних категорій.
+    /// Змінна для збереження обраного фільтра категорій.
+    @State private var selectedCategoryFilter = "Всі"
+    /// Створення спостережуваного об'єкту для моделі даних категорій.
     @StateObject private var categoryDataModel = CategoryDataModel()
     
     var body: some View {
         HStack {
-            Divider() // Вертикальний роздільник
-            // Бокова панель з категоріями
-            SidebarView(selectedFilter: $selectedFilter)
+            Divider()
+            SidebarView(selectedCategoryFilter: $selectedCategoryFilter)
                 .environmentObject(categoryDataModel)
             Divider()
             VStack {
-                // Форма введення нових транзакцій
-//                InputListView()
+                // TransactionInputView() можна використовувати для введення нових транзакцій.
+//                TransactionInputView()
 //                    .environmentObject(categoryDataModel)
-                // Основний контент, що відображає транзакції відповідно до обраного фільтра
-                TransactionsMainView(selectedCategoryFilter: $selectedFilter)
+                TransactionsMainView(selectedCategoryFilter: $selectedCategoryFilter)
                     .environmentObject(categoryDataModel)
             }
             Divider()
@@ -60,7 +58,7 @@ struct ContentView: View {
 // MARK: - SidebarView (Бокова панель)
 /// Представлення бокової панелі, яке містить логотип та список категорій.
 struct SidebarView: View {
-    @Binding var selectedFilter: String
+    @Binding var selectedCategoryFilter: String
 
     var body: some View {
         VStack {
@@ -68,7 +66,7 @@ struct SidebarView: View {
             // Логотип як кнопка
             Button(action: {
                 withAnimation {
-                    selectedFilter = "Логотип" // спеціальне значення для логотипу
+                    selectedCategoryFilter = "Логотип" // спеціальне значення для логотипу
                 }
             }) {
                 Image("1024centered-white-nobg")
@@ -82,7 +80,7 @@ struct SidebarView: View {
                     .shadow(radius: 5)
                     .padding(.bottom, 10)
             }
-            .buttonStyle(PlainButtonStyle()) // Видаляємо стандартний фон кнопки
+            .buttonStyle(PlainButtonStyle())
 
             // Заголовок для списку категорій
             HStack {
@@ -93,33 +91,33 @@ struct SidebarView: View {
             .padding(.leading, 10)
             .padding(.top, 5)
             Divider()
-            CategoryFiltersView(selectedFilter: $selectedFilter)
+            CategoryFiltersView(selectedCategoryFilter: $selectedCategoryFilter)
         }
         .frame(width: 180)
     }
 }
 
-
 // MARK: - CategoryFiltersView (Фільтри категорій)
 /// Представлення для відображення кнопок-фільтрів категорій, а також додаткових опцій для перейменування та управління категоріями.
 struct CategoryFiltersView: View {
-    // Прив'язка обраного фільтра
-    @Binding var selectedFilter: String
-    // Стан для відображення модального вікна перейменування категорії
+    /// Прив'язка обраного фільтра
+    @Binding var selectedCategoryFilter: String
+    /// Стан для відображення модального вікна перейменування категорії
     @State private var showRenameCategoryView = false
-    // Стан для відображення модального вікна управління категоріями
+    /// Стан для відображення модального вікна управління категоріями
     @State private var showCategoryManagementView = false
     @EnvironmentObject var categoryDataModel: CategoryDataModel
     
-    // Отримання всіх транзакцій (не сортуються)
+    /// Отримання всіх транзакцій (без сортування)
     @FetchRequest(sortDescriptors: [])
     private var transactions: FetchedResults<Transaction>
     
-    /// Список категорій, відсортованих за кількістю транзакцій. Перша категорія – "Всі".
+    /// Список категорій, відсортованих за кількістю транзакцій.
+    /// Перша категорія – "Всі", потім "Поповнення", а далі інші.
     private var sortedCategories: [String] {
         let others = categoryDataModel.filterOptions
             .dropFirst()
-            .filter { $0 != "Поповнення" } // Прибираємо дублікат
+            .filter { $0 != "Поповнення" }
             .sorted { lhs, rhs in
                 let lhsCount = transactions.filter { $0.validCategory == lhs }.count
                 let rhsCount = transactions.filter { $0.validCategory == rhs }.count
@@ -133,28 +131,28 @@ struct CategoryFiltersView: View {
             VStack(alignment: .leading, spacing: 10) {
                 // Відображення кнопок для кожної категорії
                 ForEach(sortedCategories, id: \.self) { option in
-                    Button(action: { withAnimation { selectedFilter = option } }) {
+                    Button(action: { withAnimation { selectedCategoryFilter = option } }) {
                         Text(option)
                             .categoryButtonStyle(
-                                isSelected: selectedFilter == option,
+                                isSelected: selectedCategoryFilter == option,
                                 color: categoryDataModel.colors[option] ?? .gray
                             )
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
-                // Кнопка для перейменування категорії, яка відображається лише коли вибрана конкретна категорія (не "Всі")
-                if selectedFilter != "Всі" && selectedFilter != "Поповнення" {
+                // Кнопка для перейменування категорії (не для "Всі" та "Поповнення")
+                if selectedCategoryFilter != "Всі" && selectedCategoryFilter != "Поповнення" {
                     Button("Перейменувати категорію") {
                         showRenameCategoryView = true
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .padding(.top)
                     .sheet(isPresented: $showRenameCategoryView) {
-                        RenameCategoryView(currentCategory: $selectedFilter)
+                        RenameCategoryView(currentCategory: $selectedCategoryFilter)
                             .environmentObject(categoryDataModel)
                     }
                 }
-                // Кнопка для управління категоріями (додавання, видалення)
+                // Кнопка для управління категоріями
                 Button("Управління категоріями") {
                     showCategoryManagementView = true
                 }
@@ -171,8 +169,8 @@ struct CategoryFiltersView: View {
         }
     }
 }
+
 // MARK: - ScaleButtonStyle (Стиль кнопки з ефектом масштабування)
-/// Користувацький стиль кнопки, який забезпечує ефект масштабування при натисканні.
 struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -181,15 +179,15 @@ struct ScaleButtonStyle: ButtonStyle {
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
-// MARK: - RenameCategoryView (Перейменування)
-/// Представлення для перейменування вибраної категорії. Дозволяє змінити назву категорії та оновити пов'язані транзакції.
+
+// MARK: - RenameCategoryView (Перейменування категорії)
+/// Представлення для перейменування вибраної категорії.
 struct RenameCategoryView: View {
-    // Доступ до контексту CoreData
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
-    // Прив'язка до поточної категорії, яка буде перейменована
+    /// Прив'язка до поточної категорії, яка буде перейменована
     @Binding var currentCategory: String
-    // Змінна для збереження нового імені
+    /// Нове ім'я категорії
     @State private var newName = ""
     @Environment(\.dismiss) var dismiss
     
@@ -197,15 +195,11 @@ struct RenameCategoryView: View {
         NavigationStack {
             Form {
                 Section(header: Text("Перейменування категорії")) {
-                    // Відображення поточної категорії
                     Text("Поточна категорія: \(currentCategory)")
-                    // Поле для введення нового імені
                     TextField("Нове ім'я", text: $newName)
                 }
-                // Кнопка збереження змін
                 Button("Зберегти") {
                     guard !newName.isEmpty else { return }
-                    // Виклик функції для перейменування категорії
                     renameCategory(oldName: currentCategory, newName: newName, in: viewContext, categoryDataModel: categoryDataModel)
                     currentCategory = newName
                     dismiss()
@@ -216,24 +210,17 @@ struct RenameCategoryView: View {
     }
 }
 
-/// Функція для оновлення транзакцій і списку категорій при перейменуванні.
-/// - Parameters:
-///   - oldName: Стара назва категорії.
-///   - newName: Нова назва категорії.
-///   - context: Контекст CoreData.
-///   - categoryDataModel: Модель даних категорій.
+/// Функція для оновлення транзакцій та списку категорій при перейменуванні.
 func renameCategory(oldName: String, newName: String, in context: NSManagedObjectContext, categoryDataModel: CategoryDataModel) {
     let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
     fetchRequest.predicate = NSPredicate(format: "category == %@", oldName)
     
     do {
         let transactionsToUpdate = try context.fetch(fetchRequest)
-        // Оновлення категорії для кожної транзакції, що відповідає старій назві
         transactionsToUpdate.forEach { $0.category = newName }
         try context.save()
         print("Оновлено \(transactionsToUpdate.count) транзакцій з категорії \(oldName) на \(newName)")
         
-        // Оновлення даних у моделі категорій
         if let index = categoryDataModel.filterOptions.firstIndex(of: oldName) {
             categoryDataModel.filterOptions[index] = newName
         }
@@ -245,29 +232,27 @@ func renameCategory(oldName: String, newName: String, in context: NSManagedObjec
         print("Помилка оновлення транзакцій: \(error.localizedDescription)")
     }
 }
+
 // MARK: - CategoryManagementView (Управління категоріями)
-/// Представлення для додавання та видалення категорій. Дає можливість користувачу керувати списком категорій.
+/// Представлення для додавання та видалення категорій.
 struct CategoryManagementView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
     @Environment(\.dismiss) var dismiss
-    // Змінна для збереження імені нової категорії
+    /// Ім'я нової категорії
     @State private var newCategoryName = ""
     
     var body: some View {
         NavigationStack {
             Form {
-                // Секція для додавання нової категорії
                 Section(header: Text("Додати категорію")) {
                     HStack {
                         TextField("Нова категорія", text: $newCategoryName)
                         Button("Додати", action: addCategory)
                     }
                 }
-                
-                // Секція для відображення існуючих категорій із можливістю видалення
                 Section(header: Text("Існуючі категорії")) {
-                    ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення"}, id: \.self) { category in
+                    ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення" }, id: \.self) { category in
                         HStack {
                             Text(category)
                             Spacer()
@@ -296,12 +281,9 @@ struct CategoryManagementView: View {
         }
     }
     
-    // MARK: - Private методи для управління категоріями
-    
-    /// Функція для додавання нової категорії до моделі даних
+    /// Додавання нової категорії
     private func addCategory() {
         let trimmed = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Перевірка, що ім'я не пусте і такої категорії ще немає
         guard !trimmed.isEmpty, !categoryDataModel.filterOptions.contains(trimmed) else { return }
         
         categoryDataModel.filterOptions.append(trimmed)
@@ -309,51 +291,43 @@ struct CategoryManagementView: View {
         newCategoryName = ""
     }
     
-    /// Функція для видалення категорії. При видаленні транзакції переназначаються на категорію "Інше".
+    /// Видалення категорії. Транзакції переназначаються на категорію "Інше".
     private func deleteCategory(_ category: String) {
         let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "category == %@", category)
         
         do {
             let transactionsToUpdate = try viewContext.fetch(fetchRequest)
-            // Заміна видаляємої категорії на "Інше" для всіх транзакцій
             transactionsToUpdate.forEach { $0.category = "Інше" }
             try viewContext.save()
         } catch {
             print("Помилка переназначення транзакцій: \(error.localizedDescription)")
         }
         
-        // Видалення категорії з моделі даних
         if let index = categoryDataModel.filterOptions.firstIndex(of: category) {
             categoryDataModel.filterOptions.remove(at: index)
         }
         categoryDataModel.colors.removeValue(forKey: category)
     }
-}
-// MARK: Кінець структур для SIDEBAR
+}// MARK: Кінець структур для SIDEBAR
 
 
 
-// MARK: - InputListView (Компонент для введення транзакцій)
-/// Представлення для введення нових транзакцій. Містить поля для введення сум, вибору категорії та коментаря.
-struct InputListView: View {
-    // Доступ до контексту CoreData
+// MARK: - TransactionInputView (Введення транзакцій)
+/// Представлення для введення нових транзакцій.
+struct TransactionInputView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
-    // Змінні для збереження введених даних
     @State private var amountUAH = ""
     @State private var amountPLN = ""
     @State private var selectedCategory = "Їжа"
     @State private var comment = ""
     
-    // Фонова темна заливка для форми введення
     private let darkBackground = Color(red: 0.2, green: 0.2, blue: 0.2)
     
     var body: some View {
         VStack(spacing: 16) {
-            // Секція форми для введення даних
             inputFormSection
-            // Секція з кнопкою для додавання транзакції
             addButtonSection
         }
         .padding(12)
@@ -363,7 +337,6 @@ struct InputListView: View {
         .padding(.horizontal, 8)
     }
     
-    /// Секція з полями вводу та вибором категорії
     private var inputFormSection: some View {
         VStack(spacing: 12) {
             currencyInputFields
@@ -373,7 +346,6 @@ struct InputListView: View {
         .padding(.horizontal, 8)
     }
     
-    /// Поля для введення сум в UAH та PLN
     private var currencyInputFields: some View {
         HStack(spacing: 12) {
             InputField(title: "UAH", text: $amountUAH)
@@ -384,13 +356,11 @@ struct InputListView: View {
         }
     }
     
-    /// Секція з вибором категорії транзакції через Picker
     private var categoryPickerSection: some View {
         HStack(spacing: 10) {
             Image(systemName: "tag.fill")
                 .foregroundColor(.gray)
             Picker("Категорія", selection: $selectedCategory) {
-                // Пропускаємо перший елемент "Всі", бо він не призначений для нових транзакцій
                 ForEach(categoryDataModel.filterOptions.dropFirst(), id: \.self) { category in
                     Text(category)
                         .tag(category)
@@ -400,19 +370,16 @@ struct InputListView: View {
             .pickerStyle(.menu)
             .padding(8)
             .background(
-                // Фон вибірника з напівпрозорим кольором категорії "Всі"
                 RoundedRectangle(cornerRadius: 10)
                     .fill(categoryDataModel.colors["Всі"]?.opacity(0.2) ?? Color.gray.opacity(0.2))
             )
             .overlay(
-                // Обводка для вибірника
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(categoryDataModel.colors["Всі"]?.opacity(0.8) ?? Color.gray.opacity(0.8), lineWidth: 1)
             )
         }
     }
     
-    /// Поле для введення коментаря до транзакції
     private var commentField: some View {
         TextField("Коментар", text: $comment)
             .padding(8)
@@ -420,21 +387,17 @@ struct InputListView: View {
             .cornerRadius(8)
     }
     
-    /// Кнопка для додавання транзакції
     private var addButtonSection: some View {
         Button("Додати витрати", action: addTransaction)
     }
     
-    /// Функція для створення та збереження нової транзакції в CoreData
     private func addTransaction() {
-        // Перевірка правильності введених числових значень
         guard let uah = Double(amountUAH),
               let pln = Double(amountPLN) else {
             print("Невірний формат суми")
             return
         }
         
-        // Створення нового об'єкту Transaction
         let newTransaction = Transaction(context: viewContext)
         newTransaction.id = UUID()
         newTransaction.amountUAH = uah
@@ -444,9 +407,7 @@ struct InputListView: View {
         newTransaction.date = Date()
         
         do {
-            // Збереження транзакції в контексті CoreData
             try viewContext.save()
-            // Очищення полів після успішного додавання
             amountUAH = ""
             amountPLN = ""
             comment = ""
@@ -456,6 +417,7 @@ struct InputListView: View {
         }
     }
 }
+
 // MARK: - InputField (Компонент вводу)
 /// Компонент для відображення заголовку і текстового поля вводу з базовим оформленням.
 struct InputField: View {
@@ -464,11 +426,9 @@ struct InputField: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Заголовок поля вводу
             Text(title)
                 .font(.caption)
                 .foregroundColor(.gray)
-            // Текстове поле з округленою рамкою
             TextField("0.00", text: $text)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .padding(.horizontal)
@@ -481,7 +441,7 @@ struct InputField: View {
         }
     }
 }
-// MARK: Кінець структур для InputListView
+// MARK: Кінець структур для TransactionInputView
 
 
 
