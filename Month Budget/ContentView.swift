@@ -492,15 +492,17 @@ struct TransactionsMainView: View {
     }
     private var budgetSummaryListView: some View {
         VStack {
+            BudgetSummaryView(
+                monthlyBudget: monthlyBudget,
+                transactions: transactions,
+                color: categoryDataModel.colors["Всі"] ?? .gray
+            )
             TransactionInputView()
                 .environmentObject(categoryDataModel)
-            List {
-                BudgetSummaryView(
-                    monthlyBudget: monthlyBudget,
-                    transactions: transactions,
-                    color: categoryDataModel.colors["Всі"] ?? .gray
-                )
-            }
+            
+//            List {
+//                
+//            }
         }
     }
     // Список для категорії "Всі"
@@ -866,7 +868,7 @@ struct TransactionCell: View {
     }
 }
 
-// MARK: - BudgetSummaryView (Підсумок бюджету)
+// MARK: - BudgetSummaryView (Покращений сучасний підсумок бюджету для macOS)
 struct BudgetSummaryView: View {
     let monthlyBudget: Double
     let transactions: FetchedResults<Transaction>
@@ -875,14 +877,20 @@ struct BudgetSummaryView: View {
     // Початковий баланс – може бути заданим константою або отриманим із налаштувань
     private let initialBalance: Double = 30165.86
 
-    // Загальні витрати (без "Поповнення")
+    // Загальні витрати (без "Поповнення" та "На інший рахунок")
     private var totalExpensesUAH: Double {
-        transactions.filter { $0.validCategory != "Поповнення" && $0.validCategory != "На інший рахунок"  }
-            .reduce(0) { $0 + $1.amountUAH }
+        transactions.filter {
+            $0.validCategory != "Поповнення" &&
+            $0.validCategory != "На інший рахунок"
+        }
+        .reduce(0) { $0 + $1.amountUAH }
     }
     private var totalExpensesPLN: Double {
-        transactions.filter { $0.validCategory != "Поповнення" && $0.validCategory != "На інший рахунок" }
-            .reduce(0) { $0 + $1.amountPLN }
+        transactions.filter {
+            $0.validCategory != "Поповнення" &&
+            $0.validCategory != "На інший рахунок"
+        }
+        .reduce(0) { $0 + $1.amountPLN }
     }
     
     // Сума поповнень (тільки категорія "Поповнення")
@@ -895,7 +903,7 @@ struct BudgetSummaryView: View {
             .reduce(0) { $0 + $1.amountPLN }
     }
     
-    // Розрахунок середнього курсу (для прикладу використовується розрахунок за витратами)
+    // Розрахунок середнього курсу (використовується розрахунок за витратами)
     private var averageRate: Double {
         totalExpensesPLN != 0 ? totalExpensesUAH / totalExpensesPLN : 0.0
     }
@@ -909,59 +917,95 @@ struct BudgetSummaryView: View {
     private var actualBalancePLN: Double { averageRate != 0 ? actualBalanceUAH / averageRate : 0.0 }
     
     var body: some View {
-        VStack(spacing: 4) {
-            // Заголовок таблиці
+        VStack(spacing: 25) {
             HStack {
-                Spacer()
-                Text("Показники")
-                    .bold()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("UAH")
-                    .bold()
-                    .frame(maxWidth: 100, alignment: .trailing)
-                Text("PLN")
-                    .bold()
-                    .frame(maxWidth: 100, alignment: .trailing)
-                Text("Курс")
-                    .bold()
-                    .frame(maxWidth: 80, alignment: .trailing)
+                Image(systemName: "creditcard.fill")
+                    .foregroundColor(color)
+                    .font(.system(size: 36, weight: .bold))
+                    .padding(.trailing, 8)
                 Spacer()
             }
-            .font(.system(size: 16, design: .monospaced))
-            .padding(.vertical, 6)
-            .background(Color.gray.opacity(0.2))
-            Divider()
-            // Рядок "Бюджет" (відображає встановлений місячний бюджет)
-            rowView(label: "Бюджет:", amountUAH: monthlyBudget, amountPLN: nil, rate: nil)
-            // Рядок "Початковий баланс"
-            rowView(label: "Початковий баланс:", amountUAH: initialBalance, amountPLN: nil, rate: nil)
-            // Рядок "Залишок очікуваний" (раніше "Баланс")
-            rowView(label: "Залишок очікуваний:", amountUAH: expectedBalanceUAH, amountPLN: expectedBalancePLN, rate: averageRate)
-            // Рядок "Залишок фактичний"
-            rowView(label: "Залишок фактичний:", amountUAH: actualBalanceUAH, amountPLN: actualBalancePLN, rate: averageRate)
+            cardView
+                .padding(.horizontal)
+            Spacer()
         }
-        .padding(.vertical)
-        .background(color.opacity(0.2))
-        .cornerRadius(12)
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Фоновий градієнт для macOS, який займає всю площу вікна
     }
     
-    @ViewBuilder
-    private func rowView(label: String, amountUAH: Double?, amountPLN: Double?, rate: Double?) -> some View {
-        HStack {
-            Spacer()
-            Text(label)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(amountUAH != nil ? "\(amountUAH!, format: .number.precision(.fractionLength(2)))" : "-")
-                .frame(maxWidth: 100, alignment: .trailing)
-            Text(amountPLN != nil ? "\(amountPLN!, format: .number.precision(.fractionLength(2)))" : "-")
-                .frame(maxWidth: 100, alignment: .trailing)
-            Text(rate != nil ? "\(rate!, format: .number.precision(.fractionLength(2)))" : "-")
-                .frame(maxWidth: 80, alignment: .trailing)
-            Spacer()
+    // MARK: - Card View
+    private var cardView: some View {
+        VStack(spacing: 20) {
+            BalanceRowView(title: "Бюджет",
+                           uah: monthlyBudget,
+                           pln: nil,
+                           rate: nil,
+                           color: color)
+            BalanceRowView(title: "Початковий баланс",
+                           uah: initialBalance,
+                           pln: nil,
+                           rate: nil,
+                           color: color)
+            BalanceRowView(title: "Залишок очікуваний",
+                           uah: expectedBalanceUAH,
+                           pln: expectedBalancePLN,
+                           rate: averageRate,
+                           color: color)
+            BalanceRowView(title: "Залишок фактичний",
+                           uah: actualBalanceUAH,
+                           pln: actualBalancePLN,
+                           rate: averageRate,
+                           color: color)
         }
-        .font(.system(size: 14, design: .monospaced))
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(NSColor.windowBackgroundColor))
+                .shadow(color: color.opacity(0.3), radius: 10, x: 0, y: 8)
+        )
     }
 }
+
+// MARK: - BalanceRowView (для macOS)
+struct BalanceRowView: View {
+    let title: String
+    let uah: Double?
+    let pln: Double?
+    let rate: Double?
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(color)
+            
+            HStack {
+                Label("UAH: \(uah != nil ? String(format: "%.2f", uah!) : "-")",
+                      systemImage: "banknote")
+                    .font(.subheadline)
+                if let plnValue = pln {
+                    Label("PLN: \(String(format: "%.2f", plnValue))",
+                          systemImage: "eurosign.circle")
+                        .font(.subheadline)
+                }
+                Spacer()
+                if let rateValue = rate, rateValue != 0 {
+                    Text("Курс: \(String(format: "%.2f", rateValue))")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Divider()
+        }
+        .padding(.vertical, 5)
+    }
+}
+
+
+
+
 
 
 
