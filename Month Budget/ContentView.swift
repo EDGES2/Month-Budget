@@ -7,7 +7,7 @@ import CoreData
 final class CategoryDataModel: ObservableObject {
     /// Список категорій для фільтрації транзакцій.
     @Published var filterOptions: [String] = [
-        "Всі", "Їжа", "Проживання", "Здоровʼя та краса",
+        "Всі", "Поповнення", "Їжа", "Проживання", "Здоровʼя та краса",
         "Інтернет послуги", "Транспорт", "Розваги та спорт",
         "Приладдя для дому", "Благо", "Електроніка", "Інше"
     ]
@@ -15,6 +15,7 @@ final class CategoryDataModel: ObservableObject {
     /// Словник відповідності категорій і кольорів, який використовується для стилізації UI.
     @Published var colors: [String: Color] = [
         "Всі": Color(red: 0.9, green: 0.9, blue: 0.9),
+        "Поповнення": Color(red: 0.0, green: 0.7, blue: 0.2),
         "Їжа": Color(red: 1.0, green: 0.6, blue: 0.0),
         "Проживання": Color(red: 0.0, green: 0.48, blue: 1.0),
         "Здоровʼя та краса": Color(red: 1.0, green: 0.41, blue: 0.71),
@@ -45,8 +46,8 @@ struct ContentView: View {
             Divider()
             VStack {
                 // Форма введення нових транзакцій
-                InputListView()
-                    .environmentObject(categoryDataModel)
+//                InputListView()
+//                    .environmentObject(categoryDataModel)
                 // Основний контент, що відображає транзакції відповідно до обраного фільтра
                 MainContentView(selectedFilter: $selectedFilter)
                     .environmentObject(categoryDataModel)
@@ -59,35 +60,39 @@ struct ContentView: View {
 // MARK: - SidebarView (Бокова панель)
 /// Представлення бокової панелі, яке містить логотип та список категорій.
 struct SidebarView: View {
-    // Прив'язка обраного фільтра для синхронізації з ContentView.
     @Binding var selectedFilter: String
-    
+
     var body: some View {
         VStack {
             Spacer()
-            // Відображення логотипу додатку
-            Image("1024centered-white-nobg")
-                .resizable()
-                // .scaledToFit() // Закоментовано для можливих налаштувань розміру
-                .frame(width: 180, height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.5), lineWidth: 2)
-                )
-                .shadow(radius: 5)
-                .padding(.bottom, 10)
+            // Логотип як кнопка
+            Button(action: {
+                withAnimation {
+                    selectedFilter = "Логотип" // спеціальне значення для логотипу
+                }
+            }) {
+                Image("1024centered-white-nobg")
+                    .resizable()
+                    .frame(width: 180, height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.white.opacity(0.5), lineWidth: 2)
+                    )
+                    .shadow(radius: 5)
+                    .padding(.bottom, 10)
+            }
+            .buttonStyle(PlainButtonStyle()) // Видаляємо стандартний фон кнопки
+
             // Заголовок для списку категорій
             HStack {
                 Text("Категорії:")
                     .font(.headline)
-                Spacer() // Забезпечує вирівнювання заголовка зліва
+                Spacer()
             }
-            .font(.headline)
             .padding(.leading, 10)
             .padding(.top, 5)
             Divider()
-            // Відображення списку кнопок-фільтрів для категорій
             CategoryFiltersView(selectedFilter: $selectedFilter)
         }
         .frame(width: 180)
@@ -117,7 +122,7 @@ struct CategoryFiltersView: View {
             let rhsCount = transactions.filter { $0.validCategory == rhs }.count
             return lhsCount > rhsCount
         }
-        return [categoryDataModel.filterOptions.first ?? "Всі"] + others
+        return [categoryDataModel.filterOptions.first ?? "Всі", "Поповнення"] + others
     }
     
     var body: some View {
@@ -135,7 +140,7 @@ struct CategoryFiltersView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
                 // Кнопка для перейменування категорії, яка відображається лише коли вибрана конкретна категорія (не "Всі")
-                if selectedFilter != "Всі" {
+                if selectedFilter != "Всі" && selectedFilter != "Поповнення" {
                     Button("Перейменувати категорію") {
                         showRenameCategoryView = true
                     }
@@ -252,7 +257,7 @@ struct CategoryManagementView: View {
                 
                 // Секція для відображення існуючих категорій із можливістю видалення
                 Section(header: Text("Існуючі категорії")) {
-                    ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" }, id: \.self) { category in
+                    ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення"}, id: \.self) { category in
                         HStack {
                             Text(category)
                             Spacer()
@@ -528,33 +533,29 @@ struct MainContentView: View {
     }
     
     var body: some View {
-        content
-            // Відображення модального вікна для редагування транзакції
-            .sheet(item: $selectedTransaction) { transaction in
-                EditTransactionView(transaction: transaction)
-                    .environment(\.managedObjectContext, viewContext)
-            }
-    }
+            content
+                .sheet(item: $selectedTransaction) { transaction in
+                    EditTransactionView(transaction: transaction)
+                        .environment(\.managedObjectContext, viewContext)
+                }
+        }
     
     /// Вибір між переглядом всіх категорій та деталями конкретної категорії
     @ViewBuilder
-    private var content: some View {
-        if selectedFilter == "Всі" {
-            allCategoriesView
-        } else {
-            categoryDetailView
+        private var content: some View {
+            if selectedFilter == "Логотип" {
+                budgetView
+            } else if selectedFilter == "Всі" {
+                allCategoriesView
+            } else {
+                categoryDetailView
+            }
         }
-    }
     
     /// Представлення, що показує загальний огляд транзакцій за всіма категоріями
     private var allCategoriesView: some View {
         List {
-            // Можна розкоментувати BudgetSummaryView для відображення бюджетного підсумку
-//            BudgetSummaryView(
-//                monthlyBudget: monthlyBudget,
-//                transactions: transactions,
-//                color: categoryDataModel.colors["Всі"] ?? .gray
-//            )
+
             totalSummary
             // Відображення підсумку для кожної категорії
             ForEach(sortedCategories, id: \.self) { category in
@@ -590,6 +591,16 @@ struct MainContentView: View {
                 }
             }
             .listStyle(PlainListStyle())
+        }
+    }
+    
+    private var budgetView: some View {
+        List{
+            BudgetSummaryView(
+                monthlyBudget: monthlyBudget,
+                transactions: transactions,
+                color: categoryDataModel.colors["Всі"] ?? .gray
+            )
         }
     }
     
