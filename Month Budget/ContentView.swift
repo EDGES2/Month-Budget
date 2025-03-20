@@ -314,137 +314,6 @@ struct CategoryManagementView: View {
 
 
 
-// MARK: - TransactionInputView (Введення транзакцій)
-/// Представлення для введення нових транзакцій.
-struct TransactionInputView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-    @EnvironmentObject var categoryDataModel: CategoryDataModel
-    @State private var amountUAH = ""
-    @State private var amountPLN = ""
-    @State private var selectedCategory = "Їжа"
-    @State private var comment = ""
-    
-    private let darkBackground = Color(red: 0.2, green: 0.2, blue: 0.2)
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            inputFormSection
-            addButtonSection
-        }
-        .padding(12)
-        .background(darkBackground)
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.4), radius: 8, x: 0, y: 2)
-        .padding(.horizontal, 8)
-    }
-    
-    private var inputFormSection: some View {
-        VStack(spacing: 12) {
-            currencyInputFields
-            categoryPickerSection
-            commentField
-        }
-        .padding(.horizontal, 8)
-    }
-    
-    private var currencyInputFields: some View {
-        HStack(spacing: 12) {
-            InputField(title: "UAH", text: $amountUAH)
-            Divider()
-                .frame(height: 40)
-                .background(Color.gray)
-            InputField(title: "PLN", text: $amountPLN)
-        }
-    }
-    
-    private var categoryPickerSection: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "tag.fill")
-                .foregroundColor(.gray)
-            Picker("Категорія", selection: $selectedCategory) {
-                ForEach(categoryDataModel.filterOptions.dropFirst(), id: \.self) { category in
-                    Text(category)
-                        .tag(category)
-                        .foregroundColor(.white)
-                }
-            }
-            .pickerStyle(.menu)
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(categoryDataModel.colors["Всі"]?.opacity(0.2) ?? Color.gray.opacity(0.2))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(categoryDataModel.colors["Всі"]?.opacity(0.8) ?? Color.gray.opacity(0.8), lineWidth: 1)
-            )
-        }
-    }
-    
-    private var commentField: some View {
-        TextField("Коментар", text: $comment)
-            .padding(8)
-            .background(Color.gray.opacity(0.2))
-            .cornerRadius(8)
-    }
-    
-    private var addButtonSection: some View {
-        Button("Додати витрати", action: addTransaction)
-    }
-    
-    private func addTransaction() {
-        guard let uah = Double(amountUAH),
-              let pln = Double(amountPLN) else {
-            print("Невірний формат суми")
-            return
-        }
-        
-        let newTransaction = Transaction(context: viewContext)
-        newTransaction.id = UUID()
-        newTransaction.amountUAH = uah
-        newTransaction.amountPLN = pln
-        newTransaction.category = selectedCategory
-        newTransaction.comment = comment
-        newTransaction.date = Date()
-        
-        do {
-            try viewContext.save()
-            amountUAH = ""
-            amountPLN = ""
-            comment = ""
-            print("Транзакцію додано успішно!")
-        } catch {
-            print("Помилка додавання транзакції: \(error.localizedDescription)")
-        }
-    }
-}
-
-// MARK: - InputField (Компонент вводу)
-/// Компонент для відображення заголовку і текстового поля вводу з базовим оформленням.
-struct InputField: View {
-    let title: String
-    @Binding var text: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.gray)
-            TextField("0.00", text: $text)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding(.horizontal)
-                .padding(8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(red: 0.15, green: 0.15, blue: 0.15))
-                )
-                .foregroundColor(.white)
-        }
-    }
-}
-// MARK: Кінець структур для TransactionInputView
-
-
 
 // MARK: - TransactionsMainView (Основний контент транзакцій)
 /// Представлення, яке відображає транзакції. Показує або загальний огляд витрат, або деталі конкретної категорії.
@@ -461,13 +330,15 @@ struct TransactionsMainView: View {
     
     private let monthlyBudget: Double = 20000.0
     
-    // Отримуємо категорії, відсортовані за кількістю транзакцій
+    /// Список категорій, відсортований за кількістю транзакцій
     private var sortedCategories: [String] {
-        categoryDataModel.filterOptions.dropFirst().filter { $0 != "Поповнення" }.sorted { lhs, rhs in
-            let lhsCount = transactions.filter { $0.validCategory == lhs }.count
-            let rhsCount = transactions.filter { $0.validCategory == rhs }.count
-            return lhsCount > rhsCount
-        }
+        categoryDataModel.filterOptions
+            .dropFirst()
+            .filter { $0 != "Поповнення" }
+            .sorted { lhs, rhs in
+                transactions.filter { $0.validCategory == lhs }.count >
+                transactions.filter { $0.validCategory == rhs }.count
+            }
     }
     
     var body: some View {
@@ -480,32 +351,34 @@ struct TransactionsMainView: View {
     
     @ViewBuilder
     private var content: some View {
-        if selectedCategoryFilter == "Логотип" {
+        switch selectedCategoryFilter {
+        case "Логотип":
             budgetSummaryListView
-        } else if selectedCategoryFilter == "Всі" {
+        case "Всі":
             allCategoriesSummaryView
-        } else if selectedCategoryFilter == "Поповнення" {
+        case "Поповнення":
             totalRepliesSummaryView
-        }else {
+        default:
             selectedCategoryDetailsView
         }
     }
+    
+    // MARK: - Subviews
+    
     private var budgetSummaryListView: some View {
-        VStack {
-            BudgetSummaryView(
-                monthlyBudget: monthlyBudget,
-                transactions: transactions,
-                color: categoryDataModel.colors["Всі"] ?? .gray
-            )
-            TransactionInputView()
-                .environmentObject(categoryDataModel)
-            
-//            List {
-//                
-//            }
+        ScrollView(.vertical) {
+            VStack {
+                BudgetSummaryView(
+                    monthlyBudget: monthlyBudget,
+                    transactions: transactions,
+                    color: categoryDataModel.colors["Всі"] ?? .gray
+                )
+                TransactionInputView()
+                    .environmentObject(categoryDataModel)
+            }
         }
     }
-    // Список для категорії "Всі"
+    
     private var allCategoriesSummaryView: some View {
         List {
             totalExpensesSummary
@@ -520,6 +393,7 @@ struct TransactionsMainView: View {
         }
         .listStyle(PlainListStyle())
     }
+    
     private var totalRepliesSummaryView: some View {
         let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
         return VStack {
@@ -539,6 +413,7 @@ struct TransactionsMainView: View {
             }
         }
     }
+    
     private var selectedCategoryDetailsView: some View {
         let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
         return VStack {
@@ -559,13 +434,18 @@ struct TransactionsMainView: View {
             .listStyle(PlainListStyle())
         }
     }
-    /// Огляд "Усі витрати" (без транзакцій "Поповнення")
+    
+    // MARK: - Summary Views
+    
     private var totalExpensesSummary: some View {
-        let expenses = transactions.filter { $0.validCategory != "Поповнення" && $0.validCategory != "На інший рахунок"}
+        let expenses = transactions.filter {
+            $0.validCategory != "Поповнення" &&
+            $0.validCategory != "На інший рахунок"
+        }
         let totalUAH = expenses.reduce(0) { $0 + $1.amountUAH }
         let totalPLN = expenses.reduce(0) { $0 + $1.amountPLN }
         let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
-
+        
         return SummaryView(
             title: "Усі витрати",
             amountUAH: totalUAH,
@@ -575,7 +455,6 @@ struct TransactionsMainView: View {
         )
     }
     
-    /// Огляд для категорії "Поповнення"
     private var replenishmentSummary: some View {
         let replenishments = transactions.filter { $0.validCategory == "Поповнення" }
         let totalUAH = replenishments.reduce(0) { $0 + $1.amountUAH }
@@ -590,6 +469,9 @@ struct TransactionsMainView: View {
             color: categoryDataModel.colors["Поповнення"] ?? .gray
         )
     }
+    
+    // MARK: - Helpers
+    
     private func deleteTransaction(_ transaction: Transaction) {
         viewContext.delete(transaction)
         do {
@@ -599,7 +481,6 @@ struct TransactionsMainView: View {
         }
     }
 }
-
 
 // MARK: - CategoryExpenseSummaryView (Підсумок витрат за категорією)
 struct CategoryExpenseSummaryView: View {
@@ -650,7 +531,6 @@ struct SummaryView: View {
 // MARK: - EditTransactionView (Редагування транзакції)
 /// Представлення для редагування існуючої транзакції. Дозволяє змінювати суму, категорію та коментар.
 struct EditTransactionView: View {
-    // Доступ до контексту CoreData
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
     #if os(iOS)
@@ -659,16 +539,14 @@ struct EditTransactionView: View {
     @Environment(\.presentationMode) var presentationMode
     #endif
 
-    // Спостереження за об'єктом транзакції для автоматичного оновлення
     @ObservedObject var transaction: Transaction
 
-    // Локальні стани для редагування значень транзакції
     @State private var editedAmountUAH: String
     @State private var editedAmountPLN: String
     @State private var selectedCategory: String
     @State private var editedComment: String
 
-    /// Ініціалізатор, що задає початкові значення для полів редагування з даних транзакції.
+    /// Ініціалізатор із початковими значеннями з транзакції
     init(transaction: Transaction) {
         self.transaction = transaction
         _editedAmountUAH = State(initialValue: String(format: "%.2f", transaction.amountUAH))
@@ -680,7 +558,6 @@ struct EditTransactionView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                // Секції для редагування полів транзакції
                 inputSection(title: "UAH:", text: $editedAmountUAH)
                 inputSection(title: "PLN:", text: $editedAmountPLN)
                 categoryPickerSection
@@ -716,7 +593,7 @@ struct EditTransactionView: View {
     
     // MARK: - Private підсекції
     
-    /// Компонент для відображення заголовку та текстового поля вводу в секції редагування
+    /// Компонент вводу з заголовком
     private func inputSection(title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -727,14 +604,13 @@ struct EditTransactionView: View {
         }
     }
     
-    /// Секція для вибору категорії редагованої транзакції
+    /// Секція для вибору категорії транзакції
     private var categoryPickerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Категорія:")
                 .font(.headline)
             Picker("Категорія", selection: $selectedCategory) {
-                // Використання динамічного списку категорій (крім "Всі")
-                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення"}, id: \.self) { category in
+                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення" }, id: \.self) { category in
                     Text(category)
                 }
             }
@@ -742,7 +618,7 @@ struct EditTransactionView: View {
         }
     }
     
-    /// Фоновий колір картки в залежності від платформи
+    /// Фоновий колір картки залежно від платформи
     private var cardBackground: Color {
         #if os(iOS)
         return Color(UIColor.systemGray6)
@@ -751,7 +627,7 @@ struct EditTransactionView: View {
         #endif
     }
     
-    /// Функція для закриття модального вікна редагування
+    /// Закриття представлення
     private func closeView() {
         #if os(iOS)
         dismiss()
@@ -760,9 +636,8 @@ struct EditTransactionView: View {
         #endif
     }
     
-    /// Функція для збереження змін в транзакції та оновлення даних в CoreData
+    /// Збереження змін в транзакції
     private func saveChanges() {
-        // Перевірка коректності числових значень
         guard let uah = Double(editedAmountUAH),
               let pln = Double(editedAmountPLN) else { return }
         
@@ -801,13 +676,13 @@ struct CategoryHeaderView: View {
         .cornerRadius(8)
     }
 }
+
 // MARK: - ReplenishmentHeaderView (Заголовок для категорії "Поповнення")
 struct ReplenishmentHeaderView: View {
     let transactions: [Transaction]
     let color: Color
     
     var body: some View {
-        // Розрахунок загальної суми поповнень в UAH
         let totalUAH = transactions.reduce(0) { $0 + $1.amountUAH }
         
         VStack(spacing: 8) {
@@ -818,6 +693,7 @@ struct ReplenishmentHeaderView: View {
         .cornerRadius(8)
     }
 }
+
 // MARK: - TransactionCell (Ячейка транзакції)
 struct TransactionCell: View {
     let transaction: Transaction
@@ -868,6 +744,180 @@ struct TransactionCell: View {
     }
 }
 
+// MARK: - TransactionInputView (Введення транзакцій)
+/// Представлення для введення нових транзакцій.
+struct TransactionInputView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var categoryDataModel: CategoryDataModel
+    @State private var amountUAH = ""
+    @State private var amountPLN = ""
+    @State private var selectedCategory = "Їжа"
+    @State private var comment = ""
+    @State private var isPresented = false  // Контроль відображення форми
+
+    private let darkBackground = Color(red: 0.2, green: 0.2, blue: 0.2)
+
+    var body: some View {
+        VStack(spacing: 12) {
+            toggleButton
+            if isPresented {
+                inputFormSection
+            }
+        }
+        .padding(12)
+        .background(darkBackground)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.4), radius: 8, x: 0, y: 2)
+        .padding(.horizontal, 8)
+    }
+    
+    private var toggleButton: some View {
+        Button(action: {
+            withAnimation { isPresented.toggle() }
+        }) {
+            Text(isPresented ? "Закрити" : "Додати витрати")
+                .transactionButtonStyle(
+                    isSelected: false,
+                    color: categoryDataModel.colors["Всі"] ?? .gray
+                )
+        }
+        .frame(height: 35)
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var inputFormSection: some View {
+        VStack(spacing: 12) {
+            currencyInputFields
+            categoryButtonsSection
+            commentField
+            Button(action: addTransaction) {
+                Text("Зберегти транзакцію")
+                    .transactionButtonStyle(
+                        isSelected: false,
+                        color: categoryDataModel.colors["Всі"] ?? .gray
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+    
+    private var currencyInputFields: some View {
+        HStack(spacing: 12) {
+            InputField(title: "UAH", text: $amountUAH)
+            Divider()
+                .frame(height: 40)
+                .background(Color.gray)
+            InputField(title: "PLN", text: $amountPLN)
+        }
+    }
+    
+    private var categoryButtonsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Категорія:")
+                .font(.caption)
+                .foregroundColor(.gray)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(categoryDataModel.filterOptions.dropFirst(), id: \.self) { category in
+                        Button(action: {
+                            selectedCategory = category
+                        }) {
+                            Text(category)
+                                .transactionButtonStyle(
+                                    isSelected: selectedCategory == category,
+                                    color: categoryDataModel.colors[category] ?? .gray
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+        }
+    }
+    
+    private var commentField: some View {
+        TextField("Коментар", text: $comment)
+            .padding(8)
+            .background(Color.gray.opacity(0.2))
+            .cornerRadius(8)
+    }
+    
+    private func addTransaction() {
+        guard let uah = Double(amountUAH),
+              let pln = Double(amountPLN) else {
+            print("Невірний формат суми")
+            return
+        }
+        
+        let newTransaction = Transaction(context: viewContext)
+        newTransaction.id = UUID()
+        newTransaction.amountUAH = uah
+        newTransaction.amountPLN = pln
+        newTransaction.category = selectedCategory
+        newTransaction.comment = comment
+        newTransaction.date = Date()
+        
+        do {
+            try viewContext.save()
+            amountUAH = ""
+            amountPLN = ""
+            comment = ""
+            isPresented = false
+            print("Транзакцію додано успішно!")
+        } catch {
+            print("Помилка додавання транзакції: \(error.localizedDescription)")
+        }
+    }
+}
+
+// MARK: - InputField (Компонент вводу)
+/// Компонент для відображення заголовку та текстового поля вводу з базовим оформленням.
+struct InputField: View {
+    let title: String
+    @Binding var text: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.gray)
+            TextField("0.00", text: $text)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding(.horizontal)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(red: 0.15, green: 0.15, blue: 0.15))
+                )
+                .foregroundColor(.white)
+        }
+    }
+}
+
+// MARK: - Text Extension для стилізації кнопок (TransactionInputView)
+extension Text {
+    func transactionButtonStyle(isSelected: Bool, color: Color) -> some View {
+        self
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(isSelected ? .white : .primary)
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
+            .background(color.opacity(isSelected ? 1.0 : 0.2))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(color.opacity(0.8), lineWidth: isSelected ? 2 : 1)
+            )
+            .shadow(color: color.opacity(isSelected ? 0.3 : 0.2),
+                    radius: isSelected ? 4 : 2,
+                    x: 0,
+                    y: isSelected ? 2 : 1)
+            .contentShape(Rectangle())
+    }
+}
+
 // MARK: - BudgetSummaryView (Покращений сучасний підсумок бюджету для macOS)
 struct BudgetSummaryView: View {
     let monthlyBudget: Double
@@ -903,118 +953,37 @@ struct BudgetSummaryView: View {
             .reduce(0) { $0 + $1.amountPLN }
     }
     
-    // Розрахунок середнього курсу (використовується розрахунок за витратами)
+    // Розрахунок середнього курсу (за витратами)
     private var averageRate: Double {
         totalExpensesPLN != 0 ? totalExpensesUAH / totalExpensesPLN : 0.0
     }
     
-    // "Залишок очікуваний" = Бюджет - всі витрати (без поповнень)
+    // "Залишок очікуваний" = Бюджет - витрати (без поповнень)
     private var expectedBalanceUAH: Double { monthlyBudget - totalExpensesUAH }
     private var expectedBalancePLN: Double { averageRate != 0 ? expectedBalanceUAH / averageRate : 0.0 }
     
-    // "Залишок фактичний" = Початковий баланс + поповнення - всі витрати (без поповнень)
+    // "Залишок фактичний" = Початковий баланс + поповнення - витрати (без поповнень)
     private var actualBalanceUAH: Double { initialBalance + totalReplenishmentUAH - totalExpensesUAH }
     private var actualBalancePLN: Double { averageRate != 0 ? actualBalanceUAH / averageRate : 0.0 }
     
     var body: some View {
-        VStack(spacing: 25) {
-            HStack {
-                Image(systemName: "creditcard.fill")
-                    .foregroundColor(color)
-                    .font(.system(size: 36, weight: .bold))
-                    .padding(.trailing, 8)
-                Spacer()
+        VStack {
+            VStack(alignment: .leading) {
+                Text("\(actualBalanceUAH, specifier: "%.2f") ₴")
+                Text("\(expectedBalanceUAH, specifier: "%.2f") ₴")
             }
-            cardView
-                .padding(.horizontal)
-            Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Фоновий градієнт для macOS, який займає всю площу вікна
-    }
-    
-    // MARK: - Card View
-    private var cardView: some View {
-        VStack(spacing: 20) {
-            BalanceRowView(title: "Бюджет",
-                           uah: monthlyBudget,
-                           pln: nil,
-                           rate: nil,
-                           color: color)
-            BalanceRowView(title: "Початковий баланс",
-                           uah: initialBalance,
-                           pln: nil,
-                           rate: nil,
-                           color: color)
-            BalanceRowView(title: "Залишок очікуваний",
-                           uah: expectedBalanceUAH,
-                           pln: expectedBalancePLN,
-                           rate: averageRate,
-                           color: color)
-            BalanceRowView(title: "Залишок фактичний",
-                           uah: actualBalanceUAH,
-                           pln: actualBalancePLN,
-                           rate: averageRate,
-                           color: color)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(NSColor.windowBackgroundColor))
-                .shadow(color: color.opacity(0.3), radius: 10, x: 0, y: 8)
-        )
     }
 }
-
-// MARK: - BalanceRowView (для macOS)
-struct BalanceRowView: View {
-    let title: String
-    let uah: Double?
-    let pln: Double?
-    let rate: Double?
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(color)
-            
-            HStack {
-                Label("UAH: \(uah != nil ? String(format: "%.2f", uah!) : "-")",
-                      systemImage: "banknote")
-                    .font(.subheadline)
-                if let plnValue = pln {
-                    Label("PLN: \(String(format: "%.2f", plnValue))",
-                          systemImage: "eurosign.circle")
-                        .font(.subheadline)
-                }
-                Spacer()
-                if let rateValue = rate, rateValue != 0 {
-                    Text("Курс: \(String(format: "%.2f", rateValue))")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-            }
-            Divider()
-        }
-        .padding(.vertical, 5)
-    }
-}
-
-
-
-
-
-
 
 // MARK: - Допоміжні компоненти та розширення
 extension Transaction {
     var wrappedId: UUID { id ?? UUID() }
     var validCategory: String { category ?? "Інше" }
 }
-// MARK: - Text Extension для стилізації кнопок категорій
+
 extension Text {
     func categoryButtonStyle(isSelected: Bool, color: Color) -> some View {
         self
@@ -1028,7 +997,12 @@ extension Text {
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(color.opacity(0.8), lineWidth: isSelected ? 2 : 1)
             )
-            .shadow(color: color.opacity(isSelected ? 0.3 : 0.2), radius: isSelected ? 4 : 2, x: 0, y: isSelected ? 2 : 1)
+            .shadow(color: color.opacity(isSelected ? 0.3 : 0.2),
+                    radius: isSelected ? 4 : 2,
+                    x: 0,
+                    y: isSelected ? 2 : 1)
             .contentShape(Rectangle())
     }
 }
+
+
