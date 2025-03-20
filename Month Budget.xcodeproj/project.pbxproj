@@ -196,11 +196,10 @@
 				};
 			};
 			buildConfigurationList = 44910D042D8072C800AF8397 /* Build configuration list for PBXProject "Month Budget" */;
-			developmentRegion = en;
+			developmentRegion = uk;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				en,
-				Base,
+				uk,
 			);
 			mainGroup = 44910D002D8072C800AF8397;
 			minimizedProjectReferenceProxies = 1;
@@ -411,6 +410,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Month Budget/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -437,6 +437,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Month Budget/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
