@@ -367,18 +367,46 @@ struct TransactionsMainView: View {
     
     private var budgetSummaryListView: some View {
         ScrollView(.vertical) {
-            VStack {
+            LazyVStack(alignment: .center, spacing: 10) {
                 BudgetSummaryView(
                     monthlyBudget: monthlyBudget,
                     transactions: transactions,
                     color: categoryDataModel.colors["Всі"] ?? .gray
                 )
+                Spacer()
                 TransactionInputView()
                     .environmentObject(categoryDataModel)
                 
+                // Бокс для історії транзакцій (приблизно 3 транзакції)
+                VStack(alignment: .leading) {
+                    Text("Історія транзакцій:")
+                        .font(.headline)
+                        .padding(.leading, 8)
+                    
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 10) {
+                            ForEach(transactions, id: \.wrappedId) { transaction in
+                                TransactionCell(
+                                    transaction: transaction,
+                                    color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
+                                    onEdit: { transactionToEdit = transaction },
+                                    onDelete: { deleteTransaction(transaction) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                    }
+                    // Фіксуємо висоту для відображення приблизно 3-х транзакцій.
+                    .frame(height: 360)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .padding()
             }
+            .padding()
         }
     }
+
     
     private var allCategoriesSummaryView: some View {
         List {
@@ -818,7 +846,7 @@ struct EditTransactionView: View {
         transaction.amountPLN = pln
         transaction.category = selectedCategory
         transaction.comment = editedComment
-        transaction.date = Date()
+//        transaction.date = Date()
         
         do {
             try viewContext.save()
@@ -922,10 +950,10 @@ struct BudgetSummaryView: View {
     let monthlyBudget: Double
     let transactions: FetchedResults<Transaction>
     let color: Color
-
+    
     // Початковий баланс – може бути заданим константою або отриманим із налаштувань
     private let initialBalance: Double = 30165.86
-
+    
     // Загальні витрати (без "Поповнення" та "На інший рахунок")
     private var totalExpensesUAH: Double {
         transactions.filter {
@@ -975,15 +1003,20 @@ struct BudgetSummaryView: View {
     private var actualBalancePLN: Double { averageRate != 0 ? actualBalanceUAH / averageRate : 0.0 }
     
     var body: some View {
-        VStack {
-            VStack(alignment: .leading) {
+        HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("\(actualBalanceUAH, specifier: "%.2f") ₴")
+                    .font(.system(size: 60, weight: .bold))
                 Text("\(expectedBalanceUAH, specifier: "%.2f") ₴")
+                    .font(.system(size: 30, weight: .medium))
             }
+            .padding()
+            .fixedSize() // Забезпечує, що VStack займає лише стільки місця, скільки потрібно для вмісту
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
+
+
 }
 
 // MARK: - Допоміжні компоненти та розширення
