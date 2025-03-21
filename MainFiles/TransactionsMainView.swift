@@ -4,7 +4,6 @@ import CoreData
 // MARK: - TransactionsMainView
 struct TransactionsMainView: View {
     @Binding var selectedCategoryFilter: String
-    @State private var transactionToEdit: Transaction?
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
 
@@ -15,45 +14,43 @@ struct TransactionsMainView: View {
     
     private let monthlyBudget: Double = 20000.0
     
-    private var sortedCategories: [String] {
-        categoryDataModel.filterOptions
-            .dropFirst()
-            .filter { $0 != "Поповнення" }
-            .sorted { lhs, rhs in
-                transactions.filter { $0.validCategory == lhs }.count >
-                transactions.filter { $0.validCategory == rhs }.count
-            }
-    }
-    
     var body: some View {
         content
-            .sheet(item: $transactionToEdit) { transaction in
-                EditTransactionView(transaction: transaction)
-                    .environment(\.managedObjectContext, viewContext)
-            }
     }
     
     @ViewBuilder
     private var content: some View {
         switch selectedCategoryFilter {
         case "Логотип":
-            budgetSummaryListView
+            BudgetSummaryListView(
+                monthlyBudget: monthlyBudget,
+                transactions: transactions,
+                categoryColor: categoryDataModel.colors["Всі"] ?? .gray
+            )
         case "Всі":
-            allCategoriesSummaryView
+            AllCategoriesSummaryView(transactions: transactions)
         case "Поповнення":
-            totalRepliesSummaryView
+            TotalRepliesSummaryView(transactions: transactions, selectedCategoryFilter: selectedCategoryFilter)
         default:
-            selectedCategoryDetailsView
+            SelectedCategoryDetailsView(transactions: transactions, selectedCategoryFilter: selectedCategoryFilter)
         }
     }
-    
-    private var budgetSummaryListView: some View {
+}
+
+struct BudgetSummaryListView: View {
+    let monthlyBudget: Double
+    let transactions: FetchedResults<Transaction>
+    let categoryColor: Color
+    @EnvironmentObject var categoryDataModel: CategoryDataModel
+    @State private var transactionToEdit: Transaction?
+
+    var body: some View {
         ScrollView(.vertical) {
             LazyVStack(alignment: .center, spacing: 10) {
                 BudgetSummaryView(
                     monthlyBudget: monthlyBudget,
                     transactions: transactions,
-                    color: categoryDataModel.colors["Всі"] ?? .gray
+                    color: categoryColor
                 )
                 Spacer()
                 TransactionInputView()
@@ -87,9 +84,38 @@ struct TransactionsMainView: View {
             }
             .padding(6)
         }
+        .sheet(item: $transactionToEdit) { transaction in
+            EditTransactionView(transaction: transaction)
+                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+        }
     }
     
-    private var allCategoriesSummaryView: some View {
+    private func deleteTransaction(_ transaction: Transaction) {
+        let viewContext = PersistenceController.shared.container.viewContext
+        viewContext.delete(transaction)
+        do {
+            try viewContext.save()
+        } catch {
+            print("Помилка видалення: \(error.localizedDescription)")
+        }
+    }
+}
+
+struct AllCategoriesSummaryView: View {
+    let transactions: FetchedResults<Transaction>
+    @EnvironmentObject var categoryDataModel: CategoryDataModel
+
+    private var sortedCategories: [String] {
+        categoryDataModel.filterOptions
+            .dropFirst()
+            .filter { $0 != "Поповнення" }
+            .sorted { lhs, rhs in
+                transactions.filter { $0.validCategory == lhs }.count >
+                transactions.filter { $0.validCategory == rhs }.count
+            }
+    }
+    
+    var body: some View {
         List {
             totalExpensesSummary
             replenishmentSummary
@@ -102,47 +128,6 @@ struct TransactionsMainView: View {
             }
         }
         .listStyle(PlainListStyle())
-    }
-    
-    private var totalRepliesSummaryView: some View {
-        let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
-        return VStack {
-            ReplenishmentHeaderView(
-                transactions: filteredTransactions,
-                color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
-            )
-            List {
-                ForEach(filteredTransactions, id: \.wrappedId) { transaction in
-                    TransactionCell(
-                        transaction: transaction,
-                        color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
-                        onEdit: { transactionToEdit = transaction },
-                        onDelete: { deleteTransaction(transaction) }
-                    )
-                }
-            }
-        }
-    }
-    
-    private var selectedCategoryDetailsView: some View {
-        let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
-        return VStack {
-            CategoryHeaderView(
-                transactions: filteredTransactions,
-                color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
-            )
-            List {
-                ForEach(filteredTransactions, id: \.wrappedId) { transaction in
-                    TransactionCell(
-                        transaction: transaction,
-                        color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
-                        onEdit: { transactionToEdit = transaction },
-                        onDelete: { deleteTransaction(transaction) }
-                    )
-                }
-            }
-            .listStyle(PlainListStyle())
-        }
     }
     
     private var totalExpensesSummary: some View {
@@ -177,8 +162,40 @@ struct TransactionsMainView: View {
             color: categoryDataModel.colors["Поповнення"] ?? .gray
         )
     }
+}
+
+struct TotalRepliesSummaryView: View {
+    let transactions: FetchedResults<Transaction>
+    let selectedCategoryFilter: String
+    @EnvironmentObject var categoryDataModel: CategoryDataModel
+    @State private var transactionToEdit: Transaction?
+
+    var body: some View {
+        let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
+        return VStack {
+            ReplenishmentHeaderView(
+                transactions: filteredTransactions,
+                color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
+            )
+            List {
+                ForEach(filteredTransactions, id: \.wrappedId) { transaction in
+                    TransactionCell(
+                        transaction: transaction,
+                        color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
+                        onEdit: { transactionToEdit = transaction },
+                        onDelete: { deleteTransaction(transaction) }
+                    )
+                }
+            }
+        }
+        .sheet(item: $transactionToEdit) { transaction in
+            EditTransactionView(transaction: transaction)
+                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+        }
+    }
     
     private func deleteTransaction(_ transaction: Transaction) {
+        let viewContext = PersistenceController.shared.container.viewContext
         viewContext.delete(transaction)
         do {
             try viewContext.save()
@@ -187,6 +204,53 @@ struct TransactionsMainView: View {
         }
     }
 }
+
+struct SelectedCategoryDetailsView: View {
+    let transactions: FetchedResults<Transaction>
+    let selectedCategoryFilter: String
+    @EnvironmentObject var categoryDataModel: CategoryDataModel
+    @State private var transactionToEdit: Transaction?
+    
+    var body: some View {
+        let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
+        return VStack {
+            CategoryHeaderView(
+                transactions: filteredTransactions,
+                color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
+            )
+            List {
+                ForEach(filteredTransactions, id: \.wrappedId) { transaction in
+                    TransactionCell(
+                        transaction: transaction,
+                        color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
+                        onEdit: { transactionToEdit = transaction },
+                        onDelete: { deleteTransaction(transaction) }
+                    )
+                }
+            }
+            .listStyle(PlainListStyle())
+        }
+        .sheet(item: $transactionToEdit) { transaction in
+            EditTransactionView(transaction: transaction)
+                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+        }
+    }
+    
+    private func deleteTransaction(_ transaction: Transaction) {
+        let viewContext = PersistenceController.shared.container.viewContext
+        viewContext.delete(transaction)
+        do {
+            try viewContext.save()
+        } catch {
+            print("Помилка видалення: \(error.localizedDescription)")
+        }
+    }
+}
+
+
+
+
+
 
 // MARK: - TransactionInputView
 struct TransactionInputView: View {
