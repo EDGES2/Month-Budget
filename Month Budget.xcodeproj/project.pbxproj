@@ -79,6 +79,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		44667CB42D8DBC3100DCF902 /* MainFiles */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = MainFiles;
+			sourceTree = "<group>";
+		};
 		44910D002D8072C800AF8397 = {
 			isa = PBXGroup;
 			children = (
@@ -88,6 +95,7 @@
 				44910D222D8072CB00AF8397 /* Month BudgetTests */,
 				44910D2C2D8072CB00AF8397 /* Month BudgetUITests */,
 				44910D0A2D8072C900AF8397 /* Products */,
+				44667CB42D8DBC3100DCF902 /* MainFiles */,
 			);
 			sourceTree = "<group>";
 		};
