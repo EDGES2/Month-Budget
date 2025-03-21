@@ -743,7 +743,7 @@ struct EditTransactionView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Категорія:")
                 .font(.headline)
-            Picker("Категорія", selection: $selectedCategory) {
+            Picker("", selection: $selectedCategory) {
                 ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення" }, id: \.self) { category in
                     Text(category)
                 }
