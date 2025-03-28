@@ -1,22 +1,6 @@
 import SwiftUI
 import CoreData
 
-// MARK: - Enum для типів фільтрації
-enum CategoryFilterType: String, CaseIterable {
-    case count = "За кількістю транзакцій"
-    case alphabetical = "За алфавітом"
-    case expenses = "За витратами UAH"
-}
-
-// Допоміжна функція для іконок фільтрації
-func filterIconName(for type: CategoryFilterType) -> String {
-    switch type {
-    case .count: return "number"
-    case .alphabetical: return "textformat.abc"
-    case .expenses: return "dollarsign.circle"
-    }
-}
-
 // MARK: - SidebarView
 struct SidebarView: View {
     @Binding var selectedCategoryFilter: String
@@ -66,7 +50,7 @@ struct SidebarView: View {
             .padding(.top, 5)
             Divider()
             // Передаємо обидва параметри: вибрану категорію та тип фільтрації
-            CategoriesView(selectedCategoryFilter: $selectedCategoryFilter,
+            Categories(selectedCategoryFilter: $selectedCategoryFilter,
                            categoryFilterType: $categoryFilterType)
         }
         .frame(width: 180)
@@ -74,12 +58,12 @@ struct SidebarView: View {
 }
 
 
-// MARK: - CategoriesView
-struct CategoriesView: View {
+// MARK: - Categories
+struct Categories: View {
     @Binding var selectedCategoryFilter: String
     @Binding var categoryFilterType: CategoryFilterType
-    @State private var showRenameCategoryView = false
-    @State private var showCategoryManagementView = false
+    @State private var showRenameCategory = false
+    @State private var showCategoryMaker = false
     @EnvironmentObject var categoryDataModel: CategoryDataModel
 
     @FetchRequest(sortDescriptors: [])
@@ -136,22 +120,22 @@ struct CategoriesView: View {
                 }
                 if selectedCategoryFilter != "Всі" && selectedCategoryFilter != "Поповнення" {
                     Button("Перейменувати категорію") {
-                        showRenameCategoryView = true
+                        showRenameCategory = true
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .padding(.top)
-                    .sheet(isPresented: $showRenameCategoryView) {
-                        RenameCategoryView(currentCategory: $selectedCategoryFilter)
+                    .sheet(isPresented: $showRenameCategory) {
+                        RenameCategory(currentCategory: $selectedCategoryFilter)
                             .environmentObject(categoryDataModel)
                     }
                 }
                 Button("Управління категоріями") {
-                    showCategoryManagementView = true
+                    showCategoryMaker = true
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .padding(.top)
-                .sheet(isPresented: $showCategoryManagementView) {
-                    CategoryManagementView()
+                .sheet(isPresented: $showCategoryMaker) {
+                    CategoryMaker()
                         .environmentObject(categoryDataModel)
                 }
                 Spacer()
@@ -172,8 +156,8 @@ struct ScaleButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - RenameCategoryView
-struct RenameCategoryView: View {
+// MARK: - RenameCategory
+struct RenameCategory: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
     @Binding var currentCategory: String
@@ -221,8 +205,8 @@ func renameCategory(oldName: String, newName: String, in context: NSManagedObjec
     }
 }
 
-// MARK: - CategoryManagementView
-struct CategoryManagementView: View {
+// MARK: - CategoryMaker
+struct CategoryMaker: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
     @Environment(\.dismiss) var dismiss

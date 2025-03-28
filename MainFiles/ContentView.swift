@@ -26,6 +26,22 @@ final class CategoryDataModel: ObservableObject {
     ]
 }
 
+// MARK: - Enum для типів фільтрації
+enum CategoryFilterType: String, CaseIterable {
+    case count = "За кількістю транзакцій"
+    case alphabetical = "За алфавітом"
+    case expenses = "За витратами UAH"
+}
+
+// Допоміжна функція для іконок фільтрації
+func filterIconName(for type: CategoryFilterType) -> String {
+    switch type {
+    case .count: return "number"
+    case .alphabetical: return "textformat.abc"
+    case .expenses: return "dollarsign.circle"
+    }
+}
+
 // MARK: - MainAppView
 struct MainAppView: View {
     @State private var selectedCategoryFilter = "Всі"
