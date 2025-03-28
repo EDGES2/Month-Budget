@@ -51,7 +51,8 @@ extension TransactionsMainView {
         let categoryColor: Color
         @EnvironmentObject var categoryDataModel: CategoryDataModel
         @State private var transactionToEdit: Transaction?
-        @State private var showTransactionInputSheet: Bool = false  // Нове поле для контролю .sheet
+        @State private var showTransactionInputSheet: Bool = false  // Для TransactionInputButton
+        @State private var showFullTransactionList: Bool = false    // Для перемикання списку транзакцій
 
         var body: some View {
             ScrollView(.vertical) {
@@ -63,7 +64,7 @@ extension TransactionsMainView {
                     )
                     Spacer()
                     
-                    // Кнопка для відкриття TransactionInputView у .sheet
+                    // Кнопка для відкриття форми додавання транзакції
                     Button(action: { showTransactionInputSheet = true }) {
                         Text("Додати транзакцію")
                             .transactionButtonStyle(
@@ -74,16 +75,43 @@ extension TransactionsMainView {
                     .buttonStyle(PlainButtonStyle())
                     .padding(.bottom, 10)
                     
+                    // Секція історії транзакцій
                     VStack(alignment: .leading) {
-                        Spacer()
-                        Text("Історія транзакцій:")
-                            .font(.headline)
-                            .padding(.leading, 8)
+                        HStack {
+                            Text("Історія транзакцій:")
+                                .font(.headline)
+                                .padding(.leading, 8)
+                            Spacer()
+                            // Кнопка перемикання режимів списку транзакцій
+                            Button(action: {
+                                withAnimation { showFullTransactionList.toggle() }
+                            }) {
+                                Image(systemName: "list.bullet")
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 10)
+                        }
+                        .padding(.top, 10)
+                        .padding(.horizontal, 5)
                         Divider()
-                        
-                        ScrollView(.vertical) {
-                            LazyVStack(spacing: 10) {
-                                ForEach(transactions, id: \.wrappedId) { transaction in
+
+                        if showFullTransactionList {
+                            ScrollView(.vertical) {
+                                LazyVStack(spacing: 10) {
+                                    ForEach(transactions, id: \.wrappedId) { transaction in
+                                        TransactionCell(
+                                            transaction: transaction,
+                                            color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
+                                            onEdit: { transactionToEdit = transaction },
+                                            onDelete: { deleteTransaction(transaction) }
+                                        )
+                                    }
+                                }
+                                .padding(.horizontal, 8)
+                            }
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(transactions.prefix(3), id: \.wrappedId) { transaction in
                                     TransactionCell(
                                         transaction: transaction,
                                         color: categoryDataModel.colors[transaction.validCategory] ?? .gray,
@@ -93,18 +121,19 @@ extension TransactionsMainView {
                                 }
                             }
                             .padding(.horizontal, 8)
+                            .padding(.bottom, 8)
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 360)
+                    .frame(height: showFullTransactionList ? nil : 360)
                     .background(Color.black.opacity(0.2))
                     .cornerRadius(12)
                 }
                 .padding(6)
             }
-            // Вивід TransactionInputView через .sheet
+            // Відображення форми TransactionInputButton через .sheet
             .sheet(isPresented: $showTransactionInputSheet) {
-                TransactionInputView()
+                TransactionInputButton()
                     .environmentObject(categoryDataModel)
                     .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
             }
@@ -189,8 +218,8 @@ extension TransactionsMainView {
             }
         }
         
-        // MARK: Nested TransactionInputView and InputField
-        struct TransactionInputView: View {
+        // MARK: Nested TransactionInputButton and InputField
+        struct TransactionInputButton: View {
             @Environment(\.managedObjectContext) private var viewContext
             @EnvironmentObject var categoryDataModel: CategoryDataModel
             @Environment(\.presentationMode) var presentationMode
@@ -204,7 +233,7 @@ extension TransactionsMainView {
 
             var body: some View {
                 NavigationStack {
-                    VStack(alignment: .center){
+                    VStack(alignment: .center) {
                         inputFormSection
                     }
                     .padding()
@@ -219,20 +248,6 @@ extension TransactionsMainView {
             }
             private func closeView() {
                 presentationMode.wrappedValue.dismiss()
-            }
-            
-            private var toggleButton: some View {
-                Button(action: {
-                    withAnimation { isPresented.toggle() }
-                }) {
-                    Text(isPresented ? "Закрити" : "Додати витрати")
-                        .transactionButtonStyle(
-                            isSelected: false,
-                            color: categoryDataModel.colors["Всі"] ?? .gray
-                        )
-                }
-                .frame(height: 35)
-                .buttonStyle(PlainButtonStyle())
             }
             
             private var inputFormSection: some View {
@@ -765,7 +780,7 @@ struct TransactionCell: View {
             }
         }
         .padding()
-        .frame(minWidth: 370, maxWidth: .infinity, minHeight: 35)
+        .frame(minWidth: 370, maxWidth: .infinity, minHeight: 35, maxHeight: 100)
         .background(color.opacity(0.2))
         .cornerRadius(12)
         .shadow(color: color.opacity(0.3), radius: 4, x: 0, y: 2)
