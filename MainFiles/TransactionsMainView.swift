@@ -51,7 +51,8 @@ extension TransactionsMainView {
         let categoryColor: Color
         @EnvironmentObject var categoryDataModel: CategoryDataModel
         @State private var transactionToEdit: Transaction?
-        
+        @State private var showTransactionInputSheet: Bool = false  // Нове поле для контролю .sheet
+
         var body: some View {
             ScrollView(.vertical) {
                 LazyVStack(alignment: .center, spacing: 10) {
@@ -61,8 +62,17 @@ extension TransactionsMainView {
                         color: categoryColor
                     )
                     Spacer()
-                    TransactionInputView()
-                        .environmentObject(categoryDataModel)
+                    
+                    // Кнопка для відкриття TransactionInputView у .sheet
+                    Button(action: { showTransactionInputSheet = true }) {
+                        Text("Додати транзакцію")
+                            .transactionButtonStyle(
+                                isSelected: false,
+                                color: categoryDataModel.colors["Всі"] ?? .gray
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.bottom, 10)
                     
                     VStack(alignment: .leading) {
                         Spacer()
@@ -91,6 +101,12 @@ extension TransactionsMainView {
                     .cornerRadius(12)
                 }
                 .padding(6)
+            }
+            // Вивід TransactionInputView через .sheet
+            .sheet(isPresented: $showTransactionInputSheet) {
+                TransactionInputView()
+                    .environmentObject(categoryDataModel)
+                    .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
             }
             .sheet(item: $transactionToEdit) { transaction in
                 EditTransactionView(transaction: transaction)
@@ -177,6 +193,7 @@ extension TransactionsMainView {
         struct TransactionInputView: View {
             @Environment(\.managedObjectContext) private var viewContext
             @EnvironmentObject var categoryDataModel: CategoryDataModel
+            @Environment(\.presentationMode) var presentationMode
             @State private var amountUAH = ""
             @State private var amountPLN = ""
             @State private var selectedCategory = "Їжа"
@@ -186,17 +203,22 @@ extension TransactionsMainView {
             private let darkBackground = Color(red: 0.2, green: 0.2, blue: 0.2)
 
             var body: some View {
-                VStack(spacing: 12) {
-                    toggleButton
-                    if isPresented {
+                NavigationStack {
+                    VStack(alignment: .center){
                         inputFormSection
                     }
+                    .padding()
+                    .background(cardBackground)
+                    .cornerRadius(12)
+                    .shadow(radius: 5)
                 }
-                .padding(12)
-                .background(darkBackground)
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(0.4), radius: 8, x: 0, y: 2)
-                .padding(.horizontal, 8)
+            }
+            
+            private var cardBackground: Color {
+                return Color(NSColor.windowBackgroundColor)
+            }
+            private func closeView() {
+                presentationMode.wrappedValue.dismiss()
             }
             
             private var toggleButton: some View {
@@ -292,8 +314,8 @@ extension TransactionsMainView {
                     amountUAH = ""
                     amountPLN = ""
                     comment = ""
-                    isPresented = false
                     print("Транзакцію додано успішно!")
+                    closeView()
                 } catch {
                     print("Помилка додавання транзакції: \(error.localizedDescription)")
                 }
@@ -324,6 +346,7 @@ extension TransactionsMainView {
         }
     }
 }
+
 
 // MARK: - AllCategoriesSummaryView and nested types
 extension TransactionsMainView {
