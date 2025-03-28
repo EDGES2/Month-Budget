@@ -390,8 +390,10 @@ extension TransactionsMainView {
                     return lhsCount > rhsCount
                 }
             case .alphabetical:
-                // Сортування за алфавітом
-                return categories.sorted()
+                // Сортування за алфавітом з використанням локалізованого порівняння
+                return categories.sorted {
+                    $0.localizedStandardCompare($1) == .orderedAscending
+                }
             case .expenses:
                 // Сортування за сумою витрат у UAH (від більшої до меншої)
                 return categories.sorted { lhs, rhs in
