@@ -4,7 +4,7 @@ import CoreData
 // MARK: - TransactionsMainView
 struct TransactionsMainView: View {
     @Binding var selectedCategoryFilter: String
-    // categoryFilterType більше не потрібен тут, якщо Sidebar знаходиться в MainAppView
+    @Binding var categoryFilterType: CategoryFilterType  // Новий binding
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
 
@@ -16,36 +16,35 @@ struct TransactionsMainView: View {
     private let monthlyBudget: Double = 20000.0
     
     var body: some View {
-        // Тільки основний контент без SidebarView
-        content
-    }
-    
-    @ViewBuilder
-    private var content: some View {
-        switch selectedCategoryFilter {
-        case "Логотип":
-            BudgetSummaryListView(
-                monthlyBudget: monthlyBudget,
-                transactions: transactions,
-                categoryColor: categoryDataModel.colors["Всі"] ?? .gray
-            )
-        case "Всі":
-            AllCategoriesSummaryView(
-                transactions: transactions,
-                categoryFilterType: .constant(.count) // або передати потрібний binding, якщо потрібно
-            )
-        case "Поповнення":
-            TotalRepliesSummaryView(
-                transactions: transactions,
-                selectedCategoryFilter: selectedCategoryFilter
-            )
-        default:
-            SelectedCategoryDetailsView(
-                transactions: transactions,
-                selectedCategoryFilter: selectedCategoryFilter
-            )
+            content
         }
-    }
+        
+        @ViewBuilder
+        private var content: some View {
+            switch selectedCategoryFilter {
+            case "Логотип":
+                BudgetSummaryListView(
+                    monthlyBudget: monthlyBudget,
+                    transactions: transactions,
+                    categoryColor: categoryDataModel.colors["Всі"] ?? .gray
+                )
+            case "Всі":
+                AllCategoriesSummaryView(
+                    transactions: transactions,
+                    categoryFilterType: $categoryFilterType  // Передаємо binding!
+                )
+            case "Поповнення":
+                TotalRepliesSummaryView(
+                    transactions: transactions,
+                    selectedCategoryFilter: selectedCategoryFilter
+                )
+            default:
+                SelectedCategoryDetailsView(
+                    transactions: transactions,
+                    selectedCategoryFilter: selectedCategoryFilter
+                )
+            }
+        }
 }
 
 

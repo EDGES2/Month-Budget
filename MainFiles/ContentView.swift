@@ -34,20 +34,20 @@ struct MainAppView: View {
     
     var body: some View {
         HStack {
-            // Лише один SidebarView для управління станом
+            Divider()
             SidebarView(selectedCategoryFilter: $selectedCategoryFilter,
                         categoryFilterType: $categoryFilterType)
                 .environmentObject(categoryDataModel)
             Divider()
             VStack {
-                TransactionsMainView(selectedCategoryFilter: $selectedCategoryFilter)
+                TransactionsMainView(selectedCategoryFilter: $selectedCategoryFilter,
+                                       categoryFilterType: $categoryFilterType)  // Передаємо binding
                     .environmentObject(categoryDataModel)
             }
             Divider()
         }
     }
 }
-
 
 
 
