@@ -1,10 +1,27 @@
 import SwiftUI
 import CoreData
 
+// MARK: - Enum для типів фільтрації
+enum CategoryFilterType: String, CaseIterable {
+    case count = "За кількістю транзакцій"
+    case alphabetical = "За алфавітом"
+    case expenses = "За витратами UAH"
+}
+
+// Допоміжна функція для іконок фільтрації
+func filterIconName(for type: CategoryFilterType) -> String {
+    switch type {
+    case .count: return "number"
+    case .alphabetical: return "textformat.abc"
+    case .expenses: return "dollarsign.circle"
+    }
+}
+
 // MARK: - SidebarView
 struct SidebarView: View {
     @Binding var selectedCategoryFilter: String
-
+    @Binding var categoryFilterType: CategoryFilterType  // Тепер приймаємо binding
+    
     var body: some View {
         VStack {
             Spacer()
@@ -29,44 +46,86 @@ struct SidebarView: View {
             HStack {
                 Text("Категорії:")
                     .font(.headline)
+                    .padding(.leading, 8)
                 Spacer()
+                // Кнопка для зміни типу фільтрації
+                Button(action: {
+                    withAnimation {
+                        switch categoryFilterType {
+                        case .count: categoryFilterType = .alphabetical
+                        case .alphabetical: categoryFilterType = .expenses
+                        case .expenses: categoryFilterType = .count
+                        }
+                    }
+                }) {
+                    Image(systemName: filterIconName(for: categoryFilterType))
+                }
+                .buttonStyle(.plain)
             }
             .padding(.leading, 10)
             .padding(.top, 5)
             Divider()
-            CategoriesView(selectedCategoryFilter: $selectedCategoryFilter)
+            // Передаємо обидва параметри: вибрану категорію та тип фільтрації
+            CategoriesView(selectedCategoryFilter: $selectedCategoryFilter,
+                           categoryFilterType: $categoryFilterType)
         }
         .frame(width: 180)
     }
 }
 
+
 // MARK: - CategoriesView
 struct CategoriesView: View {
     @Binding var selectedCategoryFilter: String
+    @Binding var categoryFilterType: CategoryFilterType
     @State private var showRenameCategoryView = false
     @State private var showCategoryManagementView = false
     @EnvironmentObject var categoryDataModel: CategoryDataModel
-    
+
     @FetchRequest(sortDescriptors: [])
     private var transactions: FetchedResults<Transaction>
-    
+
+    // Обчислювана властивість для сортування категорій відповідно до вибраного типу фільтрації
     private var sortedCategories: [String] {
-        let others = categoryDataModel.filterOptions
-            .dropFirst()
-            .filter { $0 != "Поповнення" }
-            .sorted { lhs, rhs in
+        // Базовий список – всі опції, крім спеціального логотипу (якщо він є)
+        let baseCategories = categoryDataModel.filterOptions.filter { $0 != "Логотип" }
+        // Витягуємо завжди окремо першу категорію ("Всі") та "Поповнення"
+        let first = categoryDataModel.filterOptions.first ?? "Всі"
+        let replenishment = "Поповнення"
+        let others = baseCategories.filter { $0 != first && $0 != replenishment }
+        
+        switch categoryFilterType {
+        case .count:
+            let sortedOthers = others.sorted { lhs, rhs in
                 let lhsCount = transactions.filter { $0.validCategory == lhs }.count
                 let rhsCount = transactions.filter { $0.validCategory == rhs }.count
                 return lhsCount > rhsCount
             }
-        return [categoryDataModel.filterOptions.first ?? "Всі"] + ["Поповнення"] + others
+            return [first, replenishment] + sortedOthers
+
+        case .alphabetical:
+            let sortedOthers = others.sorted()
+            return [first, replenishment] + sortedOthers
+
+        case .expenses:
+            let sortedOthers = others.sorted { lhs, rhs in
+                let lhsExpenses = transactions.filter { $0.validCategory == lhs }
+                    .reduce(0) { $0 + $1.amountUAH }
+                let rhsExpenses = transactions.filter { $0.validCategory == rhs }
+                    .reduce(0) { $0 + $1.amountUAH }
+                return lhsExpenses > rhsExpenses
+            }
+            return [first, replenishment] + sortedOthers
+        }
     }
-    
+
     var body: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(sortedCategories, id: \.self) { option in
-                    Button(action: { withAnimation { selectedCategoryFilter = option } }) {
+                    Button(action: {
+                        withAnimation { selectedCategoryFilter = option }
+                    }) {
                         Text(option)
                             .categoryButtonStyle(
                                 isSelected: selectedCategoryFilter == option,
@@ -120,7 +179,7 @@ struct RenameCategoryView: View {
     @Binding var currentCategory: String
     @State private var newName = ""
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -143,13 +202,13 @@ struct RenameCategoryView: View {
 func renameCategory(oldName: String, newName: String, in context: NSManagedObjectContext, categoryDataModel: CategoryDataModel) {
     let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
     fetchRequest.predicate = NSPredicate(format: "category == %@", oldName)
-    
+
     do {
         let transactionsToUpdate = try context.fetch(fetchRequest)
         transactionsToUpdate.forEach { $0.category = newName }
         try context.save()
         print("Оновлено \(transactionsToUpdate.count) транзакцій з категорії \(oldName) на \(newName)")
-        
+
         if let index = categoryDataModel.filterOptions.firstIndex(of: oldName) {
             categoryDataModel.filterOptions[index] = newName
         }
@@ -168,7 +227,7 @@ struct CategoryManagementView: View {
     @EnvironmentObject var categoryDataModel: CategoryDataModel
     @Environment(\.dismiss) var dismiss
     @State private var newCategoryName = ""
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -201,20 +260,20 @@ struct CategoryManagementView: View {
             }
         }
     }
-    
+
     private func addCategory() {
         let trimmed = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !categoryDataModel.filterOptions.contains(trimmed) else { return }
-        
+
         categoryDataModel.filterOptions.append(trimmed)
         categoryDataModel.colors[trimmed] = Color.gray
         newCategoryName = ""
     }
-    
+
     private func deleteCategory(_ category: String) {
         let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "category == %@", category)
-        
+
         do {
             let transactionsToUpdate = try viewContext.fetch(fetchRequest)
             transactionsToUpdate.forEach { $0.category = "Інше" }
@@ -222,7 +281,7 @@ struct CategoryManagementView: View {
         } catch {
             print("Помилка переназначення транзакцій: \(error.localizedDescription)")
         }
-        
+
         if let index = categoryDataModel.filterOptions.firstIndex(of: category) {
             categoryDataModel.filterOptions.remove(at: index)
         }

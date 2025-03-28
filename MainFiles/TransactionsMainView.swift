@@ -4,6 +4,7 @@ import CoreData
 // MARK: - TransactionsMainView
 struct TransactionsMainView: View {
     @Binding var selectedCategoryFilter: String
+    // categoryFilterType більше не потрібен тут, якщо Sidebar знаходиться в MainAppView
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
 
@@ -15,6 +16,7 @@ struct TransactionsMainView: View {
     private let monthlyBudget: Double = 20000.0
     
     var body: some View {
+        // Тільки основний контент без SidebarView
         content
     }
     
@@ -28,7 +30,10 @@ struct TransactionsMainView: View {
                 categoryColor: categoryDataModel.colors["Всі"] ?? .gray
             )
         case "Всі":
-            AllCategoriesSummaryView(transactions: transactions)
+            AllCategoriesSummaryView(
+                transactions: transactions,
+                categoryFilterType: .constant(.count) // або передати потрібний binding, якщо потрібно
+            )
         case "Поповнення":
             TotalRepliesSummaryView(
                 transactions: transactions,
@@ -42,6 +47,7 @@ struct TransactionsMainView: View {
         }
     }
 }
+
 
 // MARK: - BudgetSummaryListView and nested types
 extension TransactionsMainView {
@@ -368,17 +374,37 @@ extension TransactionsMainView {
     struct AllCategoriesSummaryView: View {
         let transactions: FetchedResults<Transaction>
         @EnvironmentObject var categoryDataModel: CategoryDataModel
-        
+        @Binding var categoryFilterType: CategoryFilterType
+
         private var sortedCategories: [String] {
-            categoryDataModel.filterOptions
+            // Виключаємо перший елемент (наприклад "Всі") та "Поповнення"
+            let categories = categoryDataModel.filterOptions
                 .dropFirst()
                 .filter { $0 != "Поповнення" }
-                .sorted { lhs, rhs in
-                    transactions.filter { $0.validCategory == lhs }.count >
-                    transactions.filter { $0.validCategory == rhs }.count
+            
+            switch categoryFilterType {
+            case .count:
+                // Сортування за кількістю транзакцій (від більшої до меншої)
+                return categories.sorted { lhs, rhs in
+                    let lhsCount = transactions.filter { $0.validCategory == lhs }.count
+                    let rhsCount = transactions.filter { $0.validCategory == rhs }.count
+                    return lhsCount > rhsCount
                 }
+            case .alphabetical:
+                // Сортування за алфавітом
+                return categories.sorted()
+            case .expenses:
+                // Сортування за сумою витрат у UAH (від більшої до меншої)
+                return categories.sorted { lhs, rhs in
+                    let lhsExpenses = transactions.filter { $0.validCategory == lhs }
+                        .reduce(0) { $0 + $1.amountUAH }
+                    let rhsExpenses = transactions.filter { $0.validCategory == rhs }
+                        .reduce(0) { $0 + $1.amountUAH }
+                    return lhsExpenses > rhsExpenses
+                }
+            }
         }
-        
+
         var body: some View {
             List {
                 totalExpensesSummary
@@ -509,6 +535,7 @@ extension TransactionsMainView {
             }
         }
     }
+
 }
 
 // MARK: - TotalRepliesSummaryView and nested types

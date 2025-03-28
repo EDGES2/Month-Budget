@@ -29,12 +29,14 @@ final class CategoryDataModel: ObservableObject {
 // MARK: - MainAppView
 struct MainAppView: View {
     @State private var selectedCategoryFilter = "Всі"
+    @State private var categoryFilterType: CategoryFilterType = .count
     @StateObject private var categoryDataModel = CategoryDataModel()
     
     var body: some View {
         HStack {
-            Divider()
-            SidebarView(selectedCategoryFilter: $selectedCategoryFilter)
+            // Лише один SidebarView для управління станом
+            SidebarView(selectedCategoryFilter: $selectedCategoryFilter,
+                        categoryFilterType: $categoryFilterType)
                 .environmentObject(categoryDataModel)
             Divider()
             VStack {
@@ -45,6 +47,8 @@ struct MainAppView: View {
         }
     }
 }
+
+
 
 
 // MARK: - Допоміжні компоненти та розширення
