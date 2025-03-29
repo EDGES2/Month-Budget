@@ -600,7 +600,6 @@ extension TransactionsMainView {
     }
 }
 extension TransactionsMainView {
-    /// Підвигляд для категорії API з кнопками оновлення та видалення транзакцій
     struct APITransactionsView: View {
         let transactions: FetchedResults<Transaction>
         let categoryDataModel: CategoryDataModel
@@ -609,13 +608,12 @@ extension TransactionsMainView {
         
         var body: some View {
             VStack {
-                // Заголовок з кнопками видалення та оновлення
                 HStack {
                     Text("API транзакції")
                         .font(.headline)
                     Spacer()
                     Button(action: {
-                        deleteAllAPITransactions()
+                        TransactionService.deleteAllAPITransactions(in: viewContext, transactions: transactions)
                     }) {
                         Image(systemName: "trash")
                             .imageScale(.large)
@@ -624,7 +622,7 @@ extension TransactionsMainView {
                     .help("Видалити всі транзакції категорії API")
                     
                     Button(action: {
-                        fetchAPITransactions()
+                        TransactionService.fetchAPITransactions(in: viewContext)
                     }) {
                         Image(systemName: "arrow.clockwise")
                             .imageScale(.large)
@@ -634,14 +632,13 @@ extension TransactionsMainView {
                 }
                 .padding()
                 
-                // Список транзакцій з категорією "API"
                 List {
                     ForEach(transactions.filter { $0.validCategory == "API" }, id: \.wrappedId) { transaction in
                         TransactionCell(
                             transaction: transaction,
                             color: categoryDataModel.colors["API"] ?? .gray,
                             onEdit: { transactionToEdit = transaction },
-                            onDelete: { deleteTransaction(transaction) }
+                            onDelete: { TransactionService.deleteTransaction(transaction, in: viewContext) }
                         )
                     }
                 }
@@ -652,56 +649,9 @@ extension TransactionsMainView {
                 }
             }
         }
-        
-        /// Функція отримання транзакцій з monobank API
-        private func fetchAPITransactions() {
-            let oneMonthAgo = Date().timeIntervalSince1970 - (30 * 24 * 60 * 60)
-            let now = Date().timeIntervalSince1970
-            let monobankAPI = MonobankAPI()
-            
-            monobankAPI.fetchTransactions(from: oneMonthAgo, to: now) { result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let data):
-                        do {
-                            let decoder = JSONDecoder()
-                            decoder.keyDecodingStrategy = .convertFromSnakeCase
-                            let apiTransactions = try decoder.decode([TransactionAPI].self, from: data)
-                            // Імпорт транзакцій у Core Data із встановленням категорії "API"
-                            TransactionService.importAPITransactions(apiTransactions: apiTransactions, in: viewContext)
-                        } catch {
-                            print("JSON Decode Error: \(error.localizedDescription)")
-                        }
-                    case .failure(let error):
-                        print("Error fetching transactions: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
-        
-        /// Видаляє одну транзакцію
-        private func deleteTransaction(_ transaction: Transaction) {
-            viewContext.delete(transaction)
-            do {
-                try viewContext.save()
-            } catch {
-                print("Помилка видалення: \(error.localizedDescription)")
-            }
-        }
-        
-        /// Видаляє всі транзакції категорії "API"
-        private func deleteAllAPITransactions() {
-            transactions.filter { $0.validCategory == "API" }.forEach { transaction in
-                viewContext.delete(transaction)
-            }
-            do {
-                try viewContext.save()
-            } catch {
-                print("Помилка видалення всіх транзакцій: \(error.localizedDescription)")
-            }
-        }
     }
 }
+
 
 
 // MARK: - Global Shared Views

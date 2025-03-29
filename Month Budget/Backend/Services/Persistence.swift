@@ -20,7 +20,6 @@ struct PersistenceController {
 
 // MARK: - Модель даних категорій
 final class CategoryDataModel: ObservableObject {
-    // Додано категорію "API" поряд із "Всі" та "Поповнення"
     @Published var filterOptions: [String] = [
         "Всі", "Поповнення", "API", "Їжа", "Проживання", "Здоровʼя та краса",
         "Інтернет послуги", "Транспорт", "Розваги та спорт",
@@ -30,7 +29,6 @@ final class CategoryDataModel: ObservableObject {
     @Published var colors: [String: Color] = [
         "Всі": Color(red: 0.9, green: 0.9, blue: 0.9),
         "Поповнення": Color(red: 0.0, green: 0.7, blue: 0.2),
-        // Для категорії API використовується явне визначення кольору
         "API": Color(red: 0.4, green: 0.4, blue: 0.9),
         "Їжа": Color(red: 1.0, green: 0.6, blue: 0.0),
         "Проживання": Color(red: 0.0, green: 0.48, blue: 1.0),
@@ -63,7 +61,6 @@ func filterIconName(for type: CategoryFilterType) -> String {
 }
 
 // MARK: - Розширення для Transaction
-// Transaction – це NSManagedObject-клас, згенерований з вашої Core Data моделі.
 extension Transaction {
     var wrappedId: UUID { id ?? UUID() }
     var validCategory: String { category ?? "Інше" }
@@ -134,26 +131,99 @@ struct TransactionService {
             return false
         }
     }
+    
     static func importAPITransactions(apiTransactions: [TransactionAPI], in context: NSManagedObjectContext) {
-            apiTransactions.forEach { apiTxn in
-                let newTransaction = Transaction(context: context)
-                newTransaction.id = UUID()
-                // Приклад конвертації суми (якщо сума з API в копійках)
-                newTransaction.amountUAH = Double(apiTxn.amount) / 100.0
-                // Встановлюємо категорію "API" для всіх транзакцій, отриманих з API
-                newTransaction.category = "API"
-                // Можна записувати опис з API як коментар
-                newTransaction.comment = apiTxn.description
-                // Встановлюємо дату, конвертуючи Unix timestamp із API
-                newTransaction.date = Date(timeIntervalSince1970: TimeInterval(apiTxn.time))
-                // Якщо потрібно – можна зберігати інші дані, наприклад, баланс чи валютний код
-            }
-            
-            do {
-                try context.save()
-                print("API transactions imported successfully!")
-            } catch {
-                print("Error saving API transactions: \(error.localizedDescription)")
+        apiTransactions.forEach { apiTxn in
+            let newTransaction = Transaction(context: context)
+            newTransaction.id = UUID()
+            // Приклад конвертації суми (якщо сума з API в копійках)
+            newTransaction.amountUAH = Double(apiTxn.amount) / 100.0
+            // Встановлюємо категорію "API" для всіх транзакцій, отриманих з API
+            newTransaction.category = "API"
+            // Записуємо опис з API як коментар
+            newTransaction.comment = apiTxn.description
+            // Встановлюємо дату, конвертуючи Unix timestamp із API
+            newTransaction.date = Date(timeIntervalSince1970: TimeInterval(apiTxn.time))
+        }
+        
+        do {
+            try context.save()
+            print("API transactions imported successfully!")
+        } catch {
+            print("Error saving API transactions: \(error.localizedDescription)")
+        }
+    }
+}
+
+// MARK: - API-функції для транзакцій
+extension TransactionService {
+    /// Завантаження транзакцій з monobank API та їх імпорт у Core Data
+    static func fetchAPITransactions(in context: NSManagedObjectContext) {
+        let oneMonthAgo = Date().timeIntervalSince1970 - (30 * 24 * 60 * 60)
+        let now = Date().timeIntervalSince1970
+        let monobankAPI = MonobankAPI()
+        
+        monobankAPI.fetchTransactions(from: oneMonthAgo, to: now) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let data):
+                    do {
+                        let decoder = JSONDecoder()
+                        decoder.keyDecodingStrategy = .convertFromSnakeCase
+                        let apiTransactions = try decoder.decode([TransactionAPI].self, from: data)
+                        // Імпорт транзакцій у Core Data із встановленням категорії "API"
+                        importAPITransactions(apiTransactions: apiTransactions, in: context)
+                    } catch {
+                        print("JSON Decode Error: \(error.localizedDescription)")
+                    }
+                case .failure(let error):
+                    print("Error fetching transactions: \(error.localizedDescription)")
+                }
             }
         }
+    }
+    
+    /// Видаляє всі транзакції категорії "API"
+    static func deleteAllAPITransactions(in context: NSManagedObjectContext, transactions: FetchedResults<Transaction>) {
+        transactions.filter { $0.validCategory == "API" }.forEach { transaction in
+            context.delete(transaction)
+        }
+        do {
+            try context.save()
+        } catch {
+            print("Помилка видалення всіх транзакцій: \(error.localizedDescription)")
+        }
+    }
+}
+
+
+// MARK: - Структура для декодування транзакцій із API
+struct TransactionAPI: Codable {
+    let id: String
+    let time: Int
+    let description: String
+    let amount: Int
+    let currencyCode: Int
+    let balance: Int
+    let category: Int  // Це поле міститиме значення "mcc"
+
+    enum CodingKeys: String, CodingKey {
+        case id, time, description, amount, currencyCode, balance
+        case category = "mcc"
+    }
+}
+
+// MARK: - Функція для тестування викликів API
+func testMonobankAPI() {
+    let api = MonobankAPI()
+    api.fetchClientInfo { result in
+        switch result {
+        case .success(let data):
+            if let json = String(data: data, encoding: .utf8) {
+                print("Client Info: \(json)")
+            }
+        case .failure(let error):
+            print("Error fetching client info: \(error.localizedDescription)")
+        }
+    }
 }
