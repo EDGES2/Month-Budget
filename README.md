@@ -1,3 +1,7 @@
+# Month Budget
+
+## Структура проєкту
+```
 Month Budget
 │── Month Budget
 │   ├── Backend
@@ -20,19 +24,19 @@ Month Budget
 │── Month BudgetUITests
 │── Products
 │── README.md
+```
 
-
-_______________________________________________________
-
-SideBar.swift
+## SideBar.swift
+```
 struct SidebarView: View
 - struct Categories
     - struct ScaleButtonStyle: ButtonStyle
     - struct RenameCategory: View
     - struct CategoryMaker: View
-_______________________________________________________
+```
 
-TransactionsMainView.swift:
+## TransactionsMainView.swift
+```
 struct TransactionsMainView: View
 - struct BudgetSummaryListView: View
     - struct BudgetSummaryView: View
@@ -52,19 +56,20 @@ struct TransactionsMainView: View
 - struct SelectedCategoryDetailsView: View
     - ~struct EditTransactionView: View
     - struct CategoryHeader: View
-_______________________________________________________
+```
 
-ContentView.swift:
+## ContentView.swift
+```
 struct MainAppView: View
 extension Text
-_______________________________________________________
+```
+
+---
+Позначення:
+- `~` означає, що структура використовується у багатьох головних структурах.
+- `''` означає, що структура використовується в одній головній структурі, але також у її підструктурі.
 
 
-
-
-
-"~" означає, що структура використовується у багатьох головних структурах
-"``" означає, що структура використовується у 1 головній структурі, але крім цього також використовується у підструктурі.
 
 
 git push -f origin HEAD
