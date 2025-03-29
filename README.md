@@ -1,25 +1,26 @@
 Month Budget
 │── Month Budget
-│   │── Backend
-│   │   │── Services
-│   │   │   │── Persistence.swift
-│   │   │── CoreData
-│   │   │   │── Month_Budget.xcdatamodeld
-│   │   │   │── Transaction+CoreDataClass.swift
-│   │   │   │── Transaction+CoreDataProperties.swift
-│   │── Frontend
-│   │   │── SideBar.swift
-│   │   │── TransactionsMainView.swift
-│   │   │── ContentView.swift
-│   │   │── Assets.xcassets
-│   │   │── Preview Content
-│   │   │   │── Media.xcassets
-│   │── Month_Budget.entitlements
-│   │── Month_BudgetApp.swift
+│   ├── Backend
+│   │   ├── Services
+│   │   │   ├── Persistence.swift
+│   │   ├── CoreData
+│   │   │   ├── Month_Budget.xcdatamodeld
+│   │   │   ├── Transaction+CoreDataClass.swift
+│   │   │   ├── Transaction+CoreDataProperties.swift
+│   ├── Frontend
+│   │   ├── SideBar.swift
+│   │   ├── TransactionsMainView.swift
+│   │   ├── ContentView.swift
+│   │   ├── Assets.xcassets
+│   │   ├── Preview Content
+│   │   │   ├── Media.xcassets
+│   ├── Month_Budget.entitlements
+│   ├── Month_BudgetApp.swift
 │── Month BudgetTests
 │── Month BudgetUITests
 │── Products
 │── README.md
+
 
 _______________________________________________________
 
