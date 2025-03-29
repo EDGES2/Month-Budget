@@ -109,7 +109,7 @@ struct Categories: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
-                if selectedCategoryFilter != "Всі" && selectedCategoryFilter != "Поповнення" {
+                if selectedCategoryFilter != "Всі" && selectedCategoryFilter != "Поповнення" && selectedCategoryFilter != "API" {
                     Button("Перейменувати категорію") {
                         showRenameCategory = true
                     }

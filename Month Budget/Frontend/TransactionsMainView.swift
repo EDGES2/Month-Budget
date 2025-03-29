@@ -38,6 +38,11 @@ struct TransactionsMainView: View {
                 transactions: transactions,
                 selectedCategoryFilter: selectedCategoryFilter
             )
+        case "API":
+            APITransactionsView(
+                transactions: transactions,
+                categoryDataModel: categoryDataModel
+            )
         default:
             SelectedCategoryDetailsView(
                 transactions: transactions,
@@ -161,14 +166,16 @@ extension TransactionsMainView {
             private var totalExpensesUAH: Double {
                 transactions.filter {
                     $0.validCategory != "Поповнення" &&
-                    $0.validCategory != "На інший рахунок"
+                    $0.validCategory != "На інший рахунок" &&
+                    $0.validCategory != "API"
                 }
                 .reduce(0) { $0 + $1.amountUAH }
             }
             private var totalExpensesPLN: Double {
                 transactions.filter {
                     $0.validCategory != "Поповнення" &&
-                    $0.validCategory != "На інший рахунок"
+                    $0.validCategory != "На інший рахунок" &&
+                    $0.validCategory != "API"
                 }
                 .reduce(0) { $0 + $1.amountPLN }
             }
@@ -347,7 +354,7 @@ extension TransactionsMainView {
         private var sortedCategories: [String] {
             let categories = categoryDataModel.filterOptions
                 .dropFirst()
-                .filter { $0 != "Поповнення" }
+                .filter { $0 != "Поповнення" && $0 != "API" }
             
             switch categoryFilterType {
             case .count:
@@ -389,7 +396,8 @@ extension TransactionsMainView {
         private var totalExpensesSummary: some View {
             let expenses = transactions.filter {
                 $0.validCategory != "Поповнення" &&
-                $0.validCategory != "На інший рахунок"
+                $0.validCategory != "На інший рахунок" &&
+                $0.validCategory != "API"
             }
             let totalUAH = expenses.reduce(0) { $0 + $1.amountUAH }
             let totalPLN = expenses.reduce(0) { $0 + $1.amountPLN }
@@ -591,6 +599,110 @@ extension TransactionsMainView {
         }
     }
 }
+extension TransactionsMainView {
+    /// Підвигляд для категорії API з кнопками оновлення та видалення транзакцій
+    struct APITransactionsView: View {
+        let transactions: FetchedResults<Transaction>
+        let categoryDataModel: CategoryDataModel
+        @Environment(\.managedObjectContext) private var viewContext
+        @State private var transactionToEdit: Transaction?
+        
+        var body: some View {
+            VStack {
+                // Заголовок з кнопками видалення та оновлення
+                HStack {
+                    Text("API транзакції")
+                        .font(.headline)
+                    Spacer()
+                    Button(action: {
+                        deleteAllAPITransactions()
+                    }) {
+                        Image(systemName: "trash")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Видалити всі транзакції категорії API")
+                    
+                    Button(action: {
+                        fetchAPITransactions()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Оновити транзакції з API")
+                }
+                .padding()
+                
+                // Список транзакцій з категорією "API"
+                List {
+                    ForEach(transactions.filter { $0.validCategory == "API" }, id: \.wrappedId) { transaction in
+                        TransactionCell(
+                            transaction: transaction,
+                            color: categoryDataModel.colors["API"] ?? .gray,
+                            onEdit: { transactionToEdit = transaction },
+                            onDelete: { deleteTransaction(transaction) }
+                        )
+                    }
+                }
+                .listStyle(PlainListStyle())
+                .sheet(item: $transactionToEdit) { transaction in
+                    EditTransaction(transaction: transaction)
+                        .environment(\.managedObjectContext, viewContext)
+                }
+            }
+        }
+        
+        /// Функція отримання транзакцій з monobank API
+        private func fetchAPITransactions() {
+            let oneMonthAgo = Date().timeIntervalSince1970 - (30 * 24 * 60 * 60)
+            let now = Date().timeIntervalSince1970
+            let monobankAPI = MonobankAPI()
+            
+            monobankAPI.fetchTransactions(from: oneMonthAgo, to: now) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let data):
+                        do {
+                            let decoder = JSONDecoder()
+                            decoder.keyDecodingStrategy = .convertFromSnakeCase
+                            let apiTransactions = try decoder.decode([TransactionAPI].self, from: data)
+                            // Імпорт транзакцій у Core Data із встановленням категорії "API"
+                            TransactionService.importAPITransactions(apiTransactions: apiTransactions, in: viewContext)
+                        } catch {
+                            print("JSON Decode Error: \(error.localizedDescription)")
+                        }
+                    case .failure(let error):
+                        print("Error fetching transactions: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+        
+        /// Видаляє одну транзакцію
+        private func deleteTransaction(_ transaction: Transaction) {
+            viewContext.delete(transaction)
+            do {
+                try viewContext.save()
+            } catch {
+                print("Помилка видалення: \(error.localizedDescription)")
+            }
+        }
+        
+        /// Видаляє всі транзакції категорії "API"
+        private func deleteAllAPITransactions() {
+            transactions.filter { $0.validCategory == "API" }.forEach { transaction in
+                viewContext.delete(transaction)
+            }
+            do {
+                try viewContext.save()
+            } catch {
+                print("Помилка видалення всіх транзакцій: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
 
 // MARK: - Global Shared Views
 struct EditTransaction: View {
@@ -654,7 +766,7 @@ struct EditTransaction: View {
             Text("Категорія:")
                 .font(.headline)
             Picker("", selection: $selectedCategory) {
-                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення" }, id: \.self) { category in
+                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення" && $0 != "API" }, id: \.self) { category in
                     Text(category)
                 }
             }

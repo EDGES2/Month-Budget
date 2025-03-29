@@ -8,7 +8,8 @@ struct PersistenceController {
     let container: NSPersistentContainer
 
     init() {
-        container = NSPersistentContainer(name: "Month_Budget") // Назва моделі Core Data має точно співпадати
+        // Назва моделі Core Data має точно співпадати
+        container = NSPersistentContainer(name: "Month_Budget")
         container.loadPersistentStores { (storeDescription, error) in
             if let error = error as NSError? {
                 fatalError("Помилка завантаження Core Data: \(error), \(error.userInfo)")
@@ -19,8 +20,9 @@ struct PersistenceController {
 
 // MARK: - Модель даних категорій
 final class CategoryDataModel: ObservableObject {
+    // Додано категорію "API" поряд із "Всі" та "Поповнення"
     @Published var filterOptions: [String] = [
-        "Всі", "Поповнення", "Їжа", "Проживання", "Здоровʼя та краса",
+        "Всі", "Поповнення", "API", "Їжа", "Проживання", "Здоровʼя та краса",
         "Інтернет послуги", "Транспорт", "Розваги та спорт",
         "Приладдя для дому", "Благо", "Електроніка", "На інший рахунок", "Інше"
     ]
@@ -28,6 +30,8 @@ final class CategoryDataModel: ObservableObject {
     @Published var colors: [String: Color] = [
         "Всі": Color(red: 0.9, green: 0.9, blue: 0.9),
         "Поповнення": Color(red: 0.0, green: 0.7, blue: 0.2),
+        // Для категорії API використовується явне визначення кольору
+        "API": Color(red: 0.4, green: 0.4, blue: 0.9),
         "Їжа": Color(red: 1.0, green: 0.6, blue: 0.0),
         "Проживання": Color(red: 0.0, green: 0.48, blue: 1.0),
         "Здоровʼя та краса": Color(red: 1.0, green: 0.41, blue: 0.71),
@@ -130,4 +134,26 @@ struct TransactionService {
             return false
         }
     }
+    static func importAPITransactions(apiTransactions: [TransactionAPI], in context: NSManagedObjectContext) {
+            apiTransactions.forEach { apiTxn in
+                let newTransaction = Transaction(context: context)
+                newTransaction.id = UUID()
+                // Приклад конвертації суми (якщо сума з API в копійках)
+                newTransaction.amountUAH = Double(apiTxn.amount) / 100.0
+                // Встановлюємо категорію "API" для всіх транзакцій, отриманих з API
+                newTransaction.category = "API"
+                // Можна записувати опис з API як коментар
+                newTransaction.comment = apiTxn.description
+                // Встановлюємо дату, конвертуючи Unix timestamp із API
+                newTransaction.date = Date(timeIntervalSince1970: TimeInterval(apiTxn.time))
+                // Якщо потрібно – можна зберігати інші дані, наприклад, баланс чи валютний код
+            }
+            
+            do {
+                try context.save()
+                print("API transactions imported successfully!")
+            } catch {
+                print("Error saving API transactions: \(error.localizedDescription)")
+            }
+        }
 }
