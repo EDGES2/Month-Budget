@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreData
+import CryptoKit
 
 // MARK: - Persistence Controller
 struct PersistenceController {
@@ -134,15 +135,24 @@ struct TransactionService {
     
     static func importAPITransactions(apiTransactions: [TransactionAPI], in context: NSManagedObjectContext) {
         apiTransactions.forEach { apiTxn in
+            // Генеруємо UUID з API id
+            let apiUUID = UUID.uuidFromString(apiTxn.id)
+            
+            // Перевірка на наявність транзакції з таким id
+            let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", apiUUID as CVarArg)
+            
+            if let count = try? context.count(for: fetchRequest), count > 0 {
+                // Транзакція з таким id вже імпортована, переходимо до наступної
+                return
+            }
+            
+            // Створення нової транзакції
             let newTransaction = Transaction(context: context)
-            newTransaction.id = UUID()
-            // Приклад конвертації суми (якщо сума з API в копійках)
+            newTransaction.id = apiUUID
             newTransaction.amountUAH = Double(apiTxn.amount) / 100.0
-            // Встановлюємо категорію "API" для всіх транзакцій, отриманих з API
             newTransaction.category = "API"
-            // Записуємо опис з API як коментар
             newTransaction.comment = apiTxn.description
-            // Встановлюємо дату, конвертуючи Unix timestamp із API
             newTransaction.date = Date(timeIntervalSince1970: TimeInterval(apiTxn.time))
         }
         
@@ -195,7 +205,26 @@ extension TransactionService {
         }
     }
 }
-
+extension UUID {
+    /// Генерує UUID на основі API id (рядка) за допомогою MD5-хешування
+    static func uuidFromString(_ string: String) -> UUID {
+        // Обчислюємо MD5-хеш з даних рядка
+        let data = Data(string.utf8)
+        let hash = Insecure.MD5.hash(data: data)
+        // Перетворюємо хеш у масив байтів
+        var uuidBytes = Array(hash)
+        
+        // Налаштовуємо байти для відповідності стандарту UUID (версія 3, варіант 1)
+        uuidBytes[6] = (uuidBytes[6] & 0x0F) | 0x30 // Версія 3
+        uuidBytes[8] = (uuidBytes[8] & 0x3F) | 0x80 // Варіант
+        
+        // Створюємо UUID з отриманих байтів
+        return uuidBytes.withUnsafeBytes { pointer in
+            let bytes = pointer.bindMemory(to: uuid_t.self)
+            return UUID(uuid: bytes.baseAddress!.pointee)
+        }
+    }
+}
 
 // MARK: - Структура для декодування транзакцій із API
 struct TransactionAPI: Codable {

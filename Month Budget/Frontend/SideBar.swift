@@ -69,7 +69,8 @@ struct Categories: View {
         let baseCategories = categoryDataModel.filterOptions.filter { $0 != "Логотип" }
         let first = categoryDataModel.filterOptions.first ?? "Всі"
         let replenishment = "Поповнення"
-        let others = baseCategories.filter { $0 != first && $0 != replenishment }
+        let api = "API"
+        let others = baseCategories.filter { $0 != first && $0 != replenishment && $0 != api}
         
         switch categoryFilterType {
         case .count:
@@ -78,10 +79,10 @@ struct Categories: View {
                 let rhsCount = transactions.filter { $0.validCategory == rhs }.count
                 return lhsCount > rhsCount
             }
-            return [first, replenishment] + sortedOthers
+            return [first, replenishment, api] + sortedOthers
         case .alphabetical:
             let sortedOthers = others.sorted()
-            return [first, replenishment] + sortedOthers
+            return [first, replenishment, api] + sortedOthers
         case .expenses:
             let sortedOthers = others.sorted { lhs, rhs in
                 let lhsExpenses = transactions.filter { $0.validCategory == lhs }
@@ -90,7 +91,7 @@ struct Categories: View {
                     .reduce(0) { $0 + $1.amountUAH }
                 return lhsExpenses > rhsExpenses
             }
-            return [first, replenishment] + sortedOthers
+            return [first, replenishment, api] + sortedOthers
         }
     }
     
