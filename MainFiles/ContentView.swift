@@ -69,13 +69,21 @@ struct MainAppView: View {
 
 // MARK: - Допоміжні компоненти та розширення
 // Extension для стилізації кнопок для TransactionInputView
+
+
+extension Transaction {
+    var wrappedId: UUID { id ?? UUID() }
+    var validCategory: String { category ?? "Інше" }
+}
+
+// extension for SideBar
 extension Text {
-    func transactionButtonStyle(isSelected: Bool, color: Color) -> some View {
+    func categoryButtonStyle(isSelected: Bool, color: Color) -> some View {
         self
             .font(.system(size: 14, weight: .medium))
-            .foregroundColor(isSelected ? .white : .primary)
+            .foregroundColor(isSelected ? (color == Color(red: 0.9, green: 0.9, blue: 0.9) ? .black : .white) : .primary)
             .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             .background(color.opacity(isSelected ? 1.0 : 0.2))
             .cornerRadius(10)
             .overlay(
@@ -90,18 +98,14 @@ extension Text {
     }
 }
 
-extension Transaction {
-    var wrappedId: UUID { id ?? UUID() }
-    var validCategory: String { category ?? "Інше" }
-}
-
+//extension for transactionsMainView
 extension Text {
-    func categoryButtonStyle(isSelected: Bool, color: Color) -> some View {
+    func transactionButtonStyle(isSelected: Bool, color: Color) -> some View {
         self
             .font(.system(size: 14, weight: .medium))
-            .foregroundColor(isSelected ? (color == Color(red: 0.9, green: 0.9, blue: 0.9) ? .black : .white) : .primary)
+            .foregroundColor(isSelected ? .white : .primary)
             .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
             .background(color.opacity(isSelected ? 1.0 : 0.2))
             .cornerRadius(10)
             .overlay(
