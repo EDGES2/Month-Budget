@@ -1,16 +1,133 @@
+import SwiftUI
 import CoreData
 
+// MARK: - Persistence Controller
 struct PersistenceController {
     static let shared = PersistenceController()
 
     let container: NSPersistentContainer
 
     init() {
-        container = NSPersistentContainer(name: "Month_Budget") // Must match exactly
+        container = NSPersistentContainer(name: "Month_Budget") // Назва моделі Core Data має точно співпадати
         container.loadPersistentStores { (storeDescription, error) in
             if let error = error as NSError? {
                 fatalError("Помилка завантаження Core Data: \(error), \(error.userInfo)")
             }
+        }
+    }
+}
+
+// MARK: - Модель даних категорій
+final class CategoryDataModel: ObservableObject {
+    @Published var filterOptions: [String] = [
+        "Всі", "Поповнення", "Їжа", "Проживання", "Здоровʼя та краса",
+        "Інтернет послуги", "Транспорт", "Розваги та спорт",
+        "Приладдя для дому", "Благо", "Електроніка", "На інший рахунок", "Інше"
+    ]
+    
+    @Published var colors: [String: Color] = [
+        "Всі": Color(red: 0.9, green: 0.9, blue: 0.9),
+        "Поповнення": Color(red: 0.0, green: 0.7, blue: 0.2),
+        "Їжа": Color(red: 1.0, green: 0.6, blue: 0.0),
+        "Проживання": Color(red: 0.0, green: 0.48, blue: 1.0),
+        "Здоровʼя та краса": Color(red: 1.0, green: 0.41, blue: 0.71),
+        "Інтернет послуги": Color(red: 0.0, green: 0.98, blue: 1.0),
+        "Транспорт": Color(red: 0.0, green: 0.8, blue: 0.4),
+        "Розваги та спорт": Color(red: 0.58, green: 0.0, blue: 0.83),
+        "Приладдя для дому": Color(red: 0.5, green: 0.5, blue: 0.5),
+        "Благо": Color(red: 0.74, green: 0.98, blue: 0.79),
+        "Електроніка": Color(red: 0.0, green: 0.5, blue: 0.5),
+        "На інший рахунок": Color(red: 0.7, green: 0.2, blue: 0.3),
+        "Інше": Color(red: 0.29, green: 0.0, blue: 0.51)
+    ]
+}
+
+// MARK: - Enum для типів фільтрації
+enum CategoryFilterType: String, CaseIterable {
+    case count = "За кількістю транзакцій"
+    case alphabetical = "За алфавітом"
+    case expenses = "За витратами UAH"
+}
+
+// Допоміжна функція для іконок фільтрації
+func filterIconName(for type: CategoryFilterType) -> String {
+    switch type {
+    case .count: return "number"
+    case .alphabetical: return "textformat.abc"
+    case .expenses: return "dollarsign.circle"
+    }
+}
+
+// MARK: - Розширення для Transaction
+// Transaction – це NSManagedObject-клас, згенерований з вашої Core Data моделі.
+extension Transaction {
+    var wrappedId: UUID { id ?? UUID() }
+    var validCategory: String { category ?? "Інше" }
+}
+
+// MARK: - TransactionService (бізнес-логіка)
+struct TransactionService {
+    static func renameCategory(oldName: String, newName: String, in context: NSManagedObjectContext, categoryDataModel: CategoryDataModel) {
+        let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "category == %@", oldName)
+        
+        do {
+            let transactionsToUpdate = try context.fetch(fetchRequest)
+            transactionsToUpdate.forEach { $0.category = newName }
+            try context.save()
+            print("Оновлено \(transactionsToUpdate.count) транзакцій з категорії \(oldName) на \(newName)")
+            
+            if let index = categoryDataModel.filterOptions.firstIndex(of: oldName) {
+                categoryDataModel.filterOptions[index] = newName
+            }
+            if let oldColor = categoryDataModel.colors[oldName] {
+                categoryDataModel.colors[newName] = oldColor
+                categoryDataModel.colors.removeValue(forKey: oldName)
+            }
+        } catch {
+            print("Помилка оновлення транзакцій: \(error.localizedDescription)")
+        }
+    }
+    
+    static func deleteTransaction(_ transaction: Transaction, in context: NSManagedObjectContext) {
+        context.delete(transaction)
+        do {
+            try context.save()
+        } catch {
+            print("Помилка видалення: \(error.localizedDescription)")
+        }
+    }
+    
+    static func addTransaction(amountUAH: Double, amountPLN: Double, selectedCategory: String, comment: String, in context: NSManagedObjectContext) -> Bool {
+        let newTransaction = Transaction(context: context)
+        newTransaction.id = UUID()
+        newTransaction.amountUAH = amountUAH
+        newTransaction.amountPLN = amountPLN
+        newTransaction.category = selectedCategory
+        newTransaction.comment = comment
+        newTransaction.date = Date()
+        
+        do {
+            try context.save()
+            print("Транзакцію додано успішно!")
+            return true
+        } catch {
+            print("Помилка додавання транзакції: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    static func updateTransaction(_ transaction: Transaction, newAmountUAH: Double, newAmountPLN: Double, newCategory: String, newComment: String, in context: NSManagedObjectContext) -> Bool {
+        transaction.amountUAH = newAmountUAH
+        transaction.amountPLN = newAmountPLN
+        transaction.category = newCategory
+        transaction.comment = newComment
+        do {
+            try context.save()
+            return true
+        } catch {
+            print("Помилка збереження: \(error.localizedDescription)")
+            return false
         }
     }
 }

@@ -87,14 +87,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		44667CB42D8DBC3100DCF902 /* MainFiles */ = {
+		446529872D97768000C71076 /* Frontend */ = {
 			isa = PBXGroup;
 			children = (
 				44667CAE2D8DBADB00DCF902 /* SideBar.swift */,
 				44667CB12D8DBB9000DCF902 /* TransactionsMainView.swift */,
 				44667C9C2D8CF1DB00DCF902 /* ContentView.swift */,
 			);
-			path = MainFiles;
+			path = Frontend;
 			sourceTree = "<group>";
 		};
 		44910D002D8072C800AF8397 = {
@@ -106,8 +106,8 @@
 				44910D222D8072CB00AF8397 /* Month BudgetTests */,
 				44910D2C2D8072CB00AF8397 /* Month BudgetUITests */,
 				44910D0A2D8072C900AF8397 /* Products */,
-				44667CB42D8DBC3100DCF902 /* MainFiles */,
 				44667CB52D8DC4E100DCF902 /* README.md */,
+				446529872D97768000C71076 /* Frontend */,
 			);
 			sourceTree = "<group>";
 		};
