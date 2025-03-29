@@ -34,33 +34,9 @@
 		44910D292D8072CB00AF8397 /* Month BudgetUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Month BudgetUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		446529A42D977ADE00C71076 /* Exceptions for "Month Budget" folder in "Month Budget" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Backend/CoreData/Month_Budget.xcdatamodeld,
-			);
-			target = 44910D082D8072C800AF8397 /* Month Budget */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		446529A52D977ADE00C71076 /* Exceptions for "Month Budget" folder in "Compile Sources" phase from "Month Budget" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = 44910D052D8072C800AF8397 /* Sources */;
-			membershipExceptions = (
-				Backend/CoreData/Month_Budget.xcdatamodeld,
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		44910D0B2D8072C900AF8397 /* Month Budget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				446529A42D977ADE00C71076 /* Exceptions for "Month Budget" folder in "Month Budget" target */,
-				446529A52D977ADE00C71076 /* Exceptions for "Month Budget" folder in "Compile Sources" phase from "Month Budget" target */,
-			);
 			path = "Month Budget";
 			sourceTree = "<group>";
 		};
@@ -428,6 +404,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"/Users/kirilltokarev/Programming/XCode/Me/Month Budget/Month Budget/Frontend/Preview Content\"";
+				DEVELOPMENT_TEAM = FR2D8V694D;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
@@ -455,6 +432,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"/Users/kirilltokarev/Programming/XCode/Me/Month Budget/Month Budget/Frontend/Preview Content\"";
+				DEVELOPMENT_TEAM = FR2D8V694D;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
