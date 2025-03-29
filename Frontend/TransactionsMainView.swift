@@ -1,13 +1,13 @@
 import SwiftUI
 import CoreData
 
-// MARK: - TransactionsMainView
+// MARK: - TransactionsMainView та супутні компоненти
 struct TransactionsMainView: View {
     @Binding var selectedCategoryFilter: String
-    @Binding var categoryFilterType: CategoryFilterType  // Новий binding
+    @Binding var categoryFilterType: CategoryFilterType
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
-
+    
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)],
         animation: .default
@@ -16,39 +16,37 @@ struct TransactionsMainView: View {
     private let monthlyBudget: Double = 20000.0
     
     var body: some View {
-            content
+        content
+    }
+    
+    @ViewBuilder
+    private var content: some View {
+        switch selectedCategoryFilter {
+        case "Логотип":
+            BudgetSummaryListView(
+                monthlyBudget: monthlyBudget,
+                transactions: transactions,
+                categoryColor: categoryDataModel.colors["Всі"] ?? .gray
+            )
+        case "Всі":
+            AllCategoriesSummaryView(
+                transactions: transactions,
+                categoryFilterType: $categoryFilterType
+            )
+        case "Поповнення":
+            TotalRepliesSummaryView(
+                transactions: transactions,
+                selectedCategoryFilter: selectedCategoryFilter
+            )
+        default:
+            SelectedCategoryDetailsView(
+                transactions: transactions,
+                selectedCategoryFilter: selectedCategoryFilter
+            )
         }
-        
-        @ViewBuilder
-        private var content: some View {
-            switch selectedCategoryFilter {
-            case "Логотип":
-                BudgetSummaryListView(
-                    monthlyBudget: monthlyBudget,
-                    transactions: transactions,
-                    categoryColor: categoryDataModel.colors["Всі"] ?? .gray
-                )
-            case "Всі":
-                AllCategoriesSummaryView(
-                    transactions: transactions,
-                    categoryFilterType: $categoryFilterType  // Передаємо binding!
-                )
-            case "Поповнення":
-                TotalRepliesSummaryView(
-                    transactions: transactions,
-                    selectedCategoryFilter: selectedCategoryFilter
-                )
-            default:
-                SelectedCategoryDetailsView(
-                    transactions: transactions,
-                    selectedCategoryFilter: selectedCategoryFilter
-                )
-            }
-        }
+    }
 }
 
-
-// MARK: - BudgetSummaryListView and nested types
 extension TransactionsMainView {
     struct BudgetSummaryListView: View {
         let monthlyBudget: Double
@@ -56,9 +54,9 @@ extension TransactionsMainView {
         let categoryColor: Color
         @EnvironmentObject var categoryDataModel: CategoryDataModel
         @State private var transactionToEdit: Transaction?
-        @State private var showTransactionInputSheet: Bool = false  // Для TransactionInput
-        @State private var showFullTransactionList: Bool = false    // Для перемикання списку транзакцій
-
+        @State private var showTransactionInputSheet: Bool = false
+        @State private var showFullTransactionList: Bool = false
+        
         var body: some View {
             ScrollView(.vertical) {
                 LazyVStack(alignment: .center, spacing: 10) {
@@ -68,8 +66,6 @@ extension TransactionsMainView {
                         color: categoryColor
                     )
                     Spacer()
-                    
-                    // Кнопка для відкриття форми додавання транзакції
                     Button(action: { showTransactionInputSheet = true }) {
                         Text("Додати транзакцію")
                             .transactionButtonStyle(
@@ -80,14 +76,12 @@ extension TransactionsMainView {
                     .buttonStyle(PlainButtonStyle())
                     .padding(.bottom, 10)
                     
-                    // Секція історії транзакцій
                     VStack(alignment: .leading) {
                         HStack {
                             Text("Історія транзакцій:")
                                 .font(.headline)
                                 .padding(.leading, 8)
                             Spacer()
-                            // Кнопка перемикання режимів списку транзакцій
                             Button(action: {
                                 withAnimation { showFullTransactionList.toggle() }
                             }) {
@@ -99,7 +93,7 @@ extension TransactionsMainView {
                         .padding(.top, 10)
                         .padding(.horizontal, 5)
                         Divider()
-
+                        
                         if showFullTransactionList {
                             ScrollView(.vertical) {
                                 LazyVStack(spacing: 10) {
@@ -136,7 +130,6 @@ extension TransactionsMainView {
                 }
                 .padding(6)
             }
-            // Відображення форми TransactionInput через .sheet
             .sheet(isPresented: $showTransactionInputSheet) {
                 TransactionInput()
                     .environmentObject(categoryDataModel)
@@ -158,7 +151,6 @@ extension TransactionsMainView {
             }
         }
         
-        // MARK: Nested BudgetSummary
         struct BudgetSummary: View {
             let monthlyBudget: Double
             let transactions: FetchedResults<Transaction>
@@ -223,7 +215,6 @@ extension TransactionsMainView {
             }
         }
         
-        // MARK: Nested TransactionInput and InputField
         struct TransactionInput: View {
             @Environment(\.managedObjectContext) private var viewContext
             @EnvironmentObject var categoryDataModel: CategoryDataModel
@@ -233,13 +224,12 @@ extension TransactionsMainView {
             @State private var selectedCategory = "Їжа"
             @State private var comment = ""
             @State private var isPresented = false
-
+            
             private let darkBackground = Color(red: 0.2, green: 0.2, blue: 0.2)
-
+            
             var body: some View {
                 NavigationStack {
                     VStack(alignment: .center, spacing: 12) {
-                        //currency Input Fields
                         HStack(spacing: 12) {
                             InputField(title: "UAH", text: $amountUAH)
                             Divider()
@@ -247,7 +237,6 @@ extension TransactionsMainView {
                                 .background(Color.gray)
                             InputField(title: "PLN", text: $amountPLN)
                         }
-                        //category Buttons Section
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Категорія:")
                                 .font(.caption)
@@ -269,12 +258,10 @@ extension TransactionsMainView {
                                 }
                             }
                         }
-                        //comment Field
                         TextField("Коментар", text: $comment)
                             .padding(8)
                             .background(Color.gray.opacity(0.2))
                             .cornerRadius(8)
-                        //button Save transaction
                         Button(action: addTransaction) {
                             Text("Зберегти транзакцію")
                                 .transactionButtonStyle(
@@ -292,8 +279,9 @@ extension TransactionsMainView {
             }
             
             private var cardBackground: Color {
-                return Color(NSColor.windowBackgroundColor)
+                Color(NSColor.windowBackgroundColor)
             }
+            
             private func closeView() {
                 presentationMode.wrappedValue.dismiss()
             }
@@ -325,7 +313,6 @@ extension TransactionsMainView {
                 }
             }
             
-            // MARK: Nested InputField
             struct InputField: View {
                 let title: String
                 @Binding var text: String
@@ -351,35 +338,29 @@ extension TransactionsMainView {
     }
 }
 
-
-// MARK: - AllCategoriesSummaryView and nested types
 extension TransactionsMainView {
     struct AllCategoriesSummaryView: View {
         let transactions: FetchedResults<Transaction>
         @EnvironmentObject var categoryDataModel: CategoryDataModel
         @Binding var categoryFilterType: CategoryFilterType
-
+        
         private var sortedCategories: [String] {
-            // Виключаємо перший елемент (наприклад "Всі") та "Поповнення"
             let categories = categoryDataModel.filterOptions
                 .dropFirst()
                 .filter { $0 != "Поповнення" }
             
             switch categoryFilterType {
             case .count:
-                // Сортування за кількістю транзакцій (від більшої до меншої)
                 return categories.sorted { lhs, rhs in
                     let lhsCount = transactions.filter { $0.validCategory == lhs }.count
                     let rhsCount = transactions.filter { $0.validCategory == rhs }.count
                     return lhsCount > rhsCount
                 }
             case .alphabetical:
-                // Сортування за алфавітом з використанням локалізованого порівняння
                 return categories.sorted {
                     $0.localizedStandardCompare($1) == .orderedAscending
                 }
             case .expenses:
-                // Сортування за сумою витрат у UAH (від більшої до меншої)
                 return categories.sorted { lhs, rhs in
                     let lhsExpenses = transactions.filter { $0.validCategory == lhs }
                         .reduce(0) { $0 + $1.amountUAH }
@@ -389,7 +370,7 @@ extension TransactionsMainView {
                 }
             }
         }
-
+        
         var body: some View {
             List {
                 totalExpensesSummary
@@ -438,7 +419,6 @@ extension TransactionsMainView {
             )
         }
         
-        // MARK: Nested CategoryExpenseSummary and its nested SummaryView
         struct CategoryExpenseSummary: View {
             let category: String
             let transactions: FetchedResults<Transaction>
@@ -458,7 +438,7 @@ extension TransactionsMainView {
                 )
             }
         }
-        // MARK: Nested SummaryView for AllCategoriesSummaryView
+        
         struct SummaryView: View {
             let title: String
             let amountUAH: Double
@@ -489,10 +469,8 @@ extension TransactionsMainView {
             }
         }
     }
-
 }
 
-// MARK: - TotalRepliesSummaryView and nested types
 extension TransactionsMainView {
     struct TotalRepliesSummaryView: View {
         let transactions: FetchedResults<Transaction>
@@ -534,14 +512,12 @@ extension TransactionsMainView {
             }
         }
         
-        // MARK: Nested ReplenishmentHeaderView
         struct ReplenishmentHeaderView: View {
             let transactions: [Transaction]
             let color: Color
             
             var body: some View {
                 let totalUAH = transactions.reduce(0) { $0 + $1.amountUAH }
-                
                 return VStack(spacing: 8) {
                     Text("Загальна сума поповнень в UAH: \(totalUAH, format: .number.precision(.fractionLength(2)))")
                 }
@@ -553,7 +529,6 @@ extension TransactionsMainView {
     }
 }
 
-// MARK: - SelectedCategoryDetailsView and nested types
 extension TransactionsMainView {
     struct SelectedCategoryDetailsView: View {
         let transactions: FetchedResults<Transaction>
@@ -596,7 +571,6 @@ extension TransactionsMainView {
             }
         }
         
-        // MARK: Nested CategoryHeader
         struct CategoryHeader: View {
             let transactions: [Transaction]
             let color: Color
@@ -605,7 +579,6 @@ extension TransactionsMainView {
                 let totalUAH = transactions.reduce(0) { $0 + $1.amountUAH }
                 let totalPLN = transactions.reduce(0) { $0 + $1.amountPLN }
                 let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
-                
                 return VStack(spacing: 8) {
                     Text("Загальна сума витрат в UAH: \(totalUAH, format: .number.precision(.fractionLength(2)))")
                     Text("Загальна сума витрат в PLN: \(totalPLN, format: .number.precision(.fractionLength(2)))")
@@ -620,19 +593,18 @@ extension TransactionsMainView {
 }
 
 // MARK: - Global Shared Views
-// Використовується у багатьох головних структурах (**)
 struct EditTransaction: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
     @Environment(\.presentationMode) var presentationMode
-
+    
     @ObservedObject var transaction: Transaction
-
+    
     @State private var editedAmountUAH: String
     @State private var editedAmountPLN: String
     @State private var selectedCategory: String
     @State private var editedComment: String
-
+    
     init(transaction: Transaction) {
         self.transaction = transaction
         _editedAmountUAH = State(initialValue: String(format: "%.2f", transaction.amountUAH))
@@ -654,7 +626,6 @@ struct EditTransaction: View {
             .cornerRadius(12)
             .shadow(radius: 5)
             .padding()
-            
             Spacer()
         }
         .navigationTitle("Редагування")
@@ -692,7 +663,7 @@ struct EditTransaction: View {
     }
     
     private var cardBackground: Color {
-        return Color(NSColor.windowBackgroundColor)
+        Color(NSColor.windowBackgroundColor)
     }
     
     private func closeView() {
@@ -717,7 +688,6 @@ struct EditTransaction: View {
     }
 }
 
-// Використовується у багатьох головних структурах (**)
 struct TransactionCell: View {
     let transaction: Transaction
     let color: Color
