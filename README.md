@@ -1,37 +1,66 @@
+Month Budget
+│── Month Budget
+│   │── Backend
+│   │   │── Services
+│   │   │   │── Persistence.swift
+│   │   │── CoreData
+│   │   │   │── Month_Budget.xcdatamodeld
+│   │   │   │── Transaction+CoreDataClass.swift
+│   │   │   │── Transaction+CoreDataProperties.swift
+│   │── Frontend
+│   │   │── SideBar.swift
+│   │   │── TransactionsMainView.swift
+│   │   │── ContentView.swift
+│   │   │── Assets.xcassets
+│   │   │── Preview Content
+│   │   │   │── Media.xcassets
+│   │── Month_Budget.entitlements
+│   │── Month_BudgetApp.swift
+│── Month BudgetTests
+│── Month BudgetUITests
+│── Products
+│── README.md
+
+_______________________________________________________
+
+SideBar.swift
+struct SidebarView: View
+- struct Categories
+    - struct ScaleButtonStyle: ButtonStyle
+    - struct RenameCategory: View
+    - struct CategoryMaker: View
+_______________________________________________________
+
+TransactionsMainView.swift:
+struct TransactionsMainView: View
+- struct BudgetSummaryListView: View
+    - struct BudgetSummaryView: View
+    - ~struct EditTransactionView: View
+    - ~struct TransactionCell: View
+    - struct TransactionInput: View
+        - struct InputField: View
+- struct AllCategoriesSummaryView: View
+    - struct CategoryExpenseSummary: View
+    - struct SummaryView: View
+    - ``struct SummaryView: View
+    - ~struct TransactionCell: View
+- struct TotalRepliesSummaryView: View
+    - ~struct EditTransactionView: View
+    - ~struct TransactionCell: View
+    - struct ReplenishmentHeader: View
+- struct SelectedCategoryDetailsView: View
+    - ~struct EditTransactionView: View
+    - struct CategoryHeader: View
+_______________________________________________________
+
 ContentView.swift:
-final class CategoryDataModel: ObservableObject
 struct MainAppView: View
 extension Text
-extension Transaction
-extension Text
+_______________________________________________________
 
-SideBar.swift:
-struct SidebarView
-- struct CategoriesView
-    - struct ScaleButtonStyle: ButtonStyle
-    - struct RenameCategoryView: View
-    - struct CategoryManagementView: View
 
-Transactions    MainView.swift:
-struct TransactionsMainView: View
-* struct BudgetSummaryListView: View
-    * struct BudgetSummaryView: View
-    * **struct EditTransactionView: View
-    * **struct TransactionCell: View
-    * struct TransactionInputView: View
-        * struct InputField: View
-* struct AllCategoriesSummaryView: View
-    * ***struct SummaryView: View
-    * **struct TransactionCell: View
-    * struct CategoryExpenseSummaryView: View
-        * struct SummaryView: View
-* struct TotalRepliesSummaryView: View
-    * **struct EditTransactionView: View
-    * **struct TransactionCell: View
-    * struct ReplenishmentHeaderView: View
-* struct SelectedCategoryDetailsView: View
-    * **struct EditTransactionView: View
-    * struct CategoryHeaderView: View
 
-"**" означає, що структура використовується у багатьох головних структурах
-"***" означає, що структура використовується у 1 головній структурі, але крім цього також використовується у підструктурі.
+
+
+"~" означає, що структура використовується у багатьох головних структурах
+"``" означає, що структура використовується у 1 головній структурі, але крім цього також використовується у підструктурі.

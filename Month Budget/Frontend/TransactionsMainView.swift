@@ -481,7 +481,7 @@ extension TransactionsMainView {
         var body: some View {
             let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
             return VStack {
-                ReplenishmentHeaderView(
+                ReplenishmentHeader(
                     transactions: filteredTransactions,
                     color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray
                 )
@@ -512,7 +512,7 @@ extension TransactionsMainView {
             }
         }
         
-        struct ReplenishmentHeaderView: View {
+        struct ReplenishmentHeader: View {
             let transactions: [Transaction]
             let color: Color
             
