@@ -120,8 +120,14 @@ struct TransactionService {
     }
     
     static func updateTransaction(_ transaction: Transaction, newAmountUAH: Double, newAmountPLN: Double, newCategory: String, newComment: String, in context: NSManagedObjectContext) -> Bool {
-        transaction.amountUAH = newAmountUAH
-        transaction.amountPLN = newAmountPLN
+        // Якщо категорія змінилася, перетворити значення на додатні
+        if transaction.category != newCategory {
+            transaction.amountUAH = abs(newAmountUAH)
+            transaction.amountPLN = abs(newAmountPLN)
+        } else {
+            transaction.amountUAH = newAmountUAH
+            transaction.amountPLN = newAmountPLN
+        }
         transaction.category = newCategory
         transaction.comment = newComment
         do {
@@ -132,6 +138,8 @@ struct TransactionService {
             return false
         }
     }
+
+
     
     static func importAPITransactions(apiTransactions: [TransactionAPI], in context: NSManagedObjectContext) {
         apiTransactions.forEach { apiTxn in
@@ -151,6 +159,7 @@ struct TransactionService {
             let newTransaction = Transaction(context: context)
             newTransaction.id = apiUUID
             newTransaction.amountUAH = Double(apiTxn.amount) / 100.0
+            newTransaction.amountPLN = Double(apiTxn.operationAmount) / 100.0
             newTransaction.category = "API"
             newTransaction.comment = apiTxn.description
             newTransaction.date = Date(timeIntervalSince1970: TimeInterval(apiTxn.time))
@@ -169,11 +178,17 @@ struct TransactionService {
 extension TransactionService {
     /// Завантаження транзакцій з monobank API та їх імпорт у Core Data
     static func fetchAPITransactions(in context: NSManagedObjectContext) {
-        let oneMonthAgo = Date().timeIntervalSince1970 - (30 * 24 * 60 * 60)
-        let now = Date().timeIntervalSince1970
+        let calendar = Calendar.current
+        let now = Date()
+        // Отримуємо 1 число поточного місяця
+        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) else {
+            print("Не вдалося визначити початок місяця")
+            return
+        }
+        
         let monobankAPI = MonobankAPI()
         
-        monobankAPI.fetchTransactions(from: oneMonthAgo, to: now) { result in
+        monobankAPI.fetchTransactions(from: startOfMonth.timeIntervalSince1970, to: now.timeIntervalSince1970) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let data):
@@ -232,12 +247,13 @@ struct TransactionAPI: Codable {
     let time: Int
     let description: String
     let amount: Int
+    let operationAmount: Int
     let currencyCode: Int
     let balance: Int
     let category: Int  // Це поле міститиме значення "mcc"
 
     enum CodingKeys: String, CodingKey {
-        case id, time, description, amount, currencyCode, balance
+        case id, time, description, amount, operationAmount, currencyCode, balance
         case category = "mcc"
     }
 }

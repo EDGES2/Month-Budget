@@ -54,7 +54,7 @@ struct SidebarView: View {
         .frame(width: 180)
     }
 }
-
+ 
 struct Categories: View {
     @Binding var selectedCategoryFilter: String
     @Binding var categoryFilterType: CategoryFilterType

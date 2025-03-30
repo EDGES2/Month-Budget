@@ -161,7 +161,7 @@ extension TransactionsMainView {
             let transactions: FetchedResults<Transaction>
             let color: Color
             
-            private let initialBalance: Double = 30165.86
+            private let initialBalance: Double = 29703.54
             
             private var totalExpensesUAH: Double {
                 transactions.filter {
@@ -716,7 +716,7 @@ struct EditTransaction: View {
             Text("Категорія:")
                 .font(.headline)
             Picker("", selection: $selectedCategory) {
-                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі" && $0 != "Поповнення" && $0 != "API" }, id: \.self) { category in
+                ForEach(categoryDataModel.filterOptions.filter { $0 != "Всі"/* && $0 != "Поповнення" && $0 != "API" */}, id: \.self) { category in
                     Text(category)
                 }
             }
@@ -736,18 +736,17 @@ struct EditTransaction: View {
         guard let uah = Double(editedAmountUAH),
               let pln = Double(editedAmountPLN) else { return }
         
-        transaction.amountUAH = uah
-        transaction.amountPLN = pln
-        transaction.category = selectedCategory
-        transaction.comment = editedComment
-        
-        do {
-            try viewContext.save()
+        let success = TransactionService.updateTransaction(transaction,
+                                                             newAmountUAH: uah,
+                                                             newAmountPLN: pln,
+                                                             newCategory: selectedCategory,
+                                                             newComment: editedComment,
+                                                             in: viewContext)
+        if success {
             closeView()
-        } catch {
-            print("Помилка збереження: \(error.localizedDescription)")
         }
     }
+
 }
 
 struct TransactionCell: View {
