@@ -54,7 +54,7 @@ struct SidebarView: View {
         .frame(width: 180)
     }
 }
- 
+
 struct Categories: View {
     @Binding var selectedCategoryFilter: String
     @Binding var categoryFilterType: CategoryFilterType
@@ -70,7 +70,7 @@ struct Categories: View {
         let first = categoryDataModel.filterOptions.first ?? "Всі"
         let replenishment = "Поповнення"
         let api = "API"
-        let others = baseCategories.filter { $0 != first && $0 != replenishment && $0 != api}
+        let others = baseCategories.filter { $0 != first && $0 != replenishment && $0 != api }
         
         switch categoryFilterType {
         case .count:
@@ -84,11 +84,19 @@ struct Categories: View {
             let sortedOthers = others.sorted()
             return [first, replenishment, api] + sortedOthers
         case .expenses:
+            // Для сортування за витратами використовуємо першу суму (firstAmount) і конвертуємо суму у базову валюту ("UAH")
+            let currencyManager = CurrencyManager() // Створюємо тимчасовий менеджер валют
             let sortedOthers = others.sorted { lhs, rhs in
                 let lhsExpenses = transactions.filter { $0.validCategory == lhs }
-                    .reduce(0) { $0 + $1.amountUAH }
+                    .reduce(0) { total, txn in
+                        let txnCurrency = txn.firstCurrencyCode ?? currencyManager.baseCurrencyCode
+                        return total + currencyManager.convert(amount: txn.firstAmount, from: txnCurrency, to: "UAH")
+                    }
                 let rhsExpenses = transactions.filter { $0.validCategory == rhs }
-                    .reduce(0) { $0 + $1.amountUAH }
+                    .reduce(0) { total, txn in
+                        let txnCurrency = txn.firstCurrencyCode ?? currencyManager.baseCurrencyCode
+                        return total + currencyManager.convert(amount: txn.firstAmount, from: txnCurrency, to: "UAH")
+                    }
                 return lhsExpenses > rhsExpenses
             }
             return [first, replenishment, api] + sortedOthers

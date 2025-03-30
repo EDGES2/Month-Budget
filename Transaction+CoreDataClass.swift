@@ -2,7 +2,7 @@
 //  Transaction+CoreDataClass.swift
 //  Month Budget
 //
-//  Created by Kyrylo Tokariev on 11.03.2025.
+//  Created by Kyrylo Tokariev on 30.03.2025.
 //
 //
 
