@@ -16,11 +16,6 @@ struct TransactionsMainView: View {
     private let monthlyBudget: Double = 20000.0
     
     var body: some View {
-        content
-    }
-    
-    @ViewBuilder
-    private var content: some View {
         switch selectedCategoryFilter {
         case "Логотип":
             BudgetSummaryListView(
@@ -155,7 +150,7 @@ extension TransactionsMainView {
                 print("Помилка видалення: \(error.localizedDescription)")
             }
         }
-        
+        // MARK: Виконавчі функції підрахунку
         struct BudgetSummary: View {
             let monthlyBudget: Double
             let transactions: FetchedResults<Transaction>
