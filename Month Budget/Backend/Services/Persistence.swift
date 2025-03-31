@@ -39,9 +39,11 @@ class CurrencyManager: ObservableObject {
         let filtered = transactions.filter { txn in
             txn.firstCurrencyCode == from && txn.secondCurrencyCode == to && txn.secondAmount != 0
         }
+        
         let sorted = filtered.sorted {
             ($0.date ?? Date.distantPast) > ($1.date ?? Date.distantPast)
         }
+        
         if let txn = sorted.first {
             return txn.firstAmount / txn.secondAmount
         }
@@ -63,7 +65,8 @@ class CurrencyManager: ObservableObject {
         return 0
     }
 }
-// Додамо допоміжний метод у розширенні CurrencyManager для пошуку транзакції з мінімальною різницею дат
+
+// Допоміжний метод для пошуку транзакції з мінімальною різницею дат
 extension CurrencyManager {
     /// Повертає транзакцію з валютою from та to, дата якої найбільше наближена до заданої дати.
     func nearestTransaction(from: String, to: String, forDate date: Date, transactions: [Transaction]) -> Transaction? {
@@ -78,13 +81,10 @@ extension CurrencyManager {
     }
 }
 
-
-
 // MARK: - Persistence Controller
 
 struct PersistenceController {
     static let shared = PersistenceController()
-
     let container: NSPersistentContainer
 
     init() {
@@ -98,8 +98,8 @@ struct PersistenceController {
 }
 
 // MARK: - Обчислення для транзакцій (уніфіковані за новими атрибутами)
-
 extension PersistenceController {
+    
     // Підрахунок витрат (не включаючи "Поповнення", "На інший рахунок" та "API")
     func totalExpenses(for transactions: [Transaction],
                        targetCurrency: String,
@@ -108,6 +108,7 @@ extension PersistenceController {
             let cat = txn.validCategory
             return cat != "Поповнення" && cat != "На інший рахунок" && cat != "API"
         }
+        
         if targetCurrency == currencyManager.baseCurrency1 {
             return expenseTransactions.reduce(0) { total, txn in
                 total + txn.firstAmount
@@ -124,6 +125,7 @@ extension PersistenceController {
                             targetCurrency: String,
                             currencyManager: CurrencyManager) -> Double {
         let replenishmentTransactions = transactions.filter { $0.validCategory == "Поповнення" }
+        
         if targetCurrency == currencyManager.baseCurrency1 {
             return replenishmentTransactions.reduce(0) { total, txn in
                 total + txn.firstAmount
@@ -140,6 +142,7 @@ extension PersistenceController {
                              targetCurrency: String,
                              currencyManager: CurrencyManager) -> Double {
         let transferTransactions = transactions.filter { $0.validCategory == "На інший рахунок" }
+        
         if targetCurrency == currencyManager.baseCurrency1 {
             return transferTransactions.reduce(0) { total, txn in
                 total + txn.firstAmount
@@ -199,8 +202,8 @@ extension PersistenceController {
     }
 }
 
-
 // MARK: - Модель даних категорій
+
 final class CategoryDataModel: ObservableObject {
     @Published var filterOptions: [String] = [
         "Всі", "Поповнення", "API", "Їжа", "Проживання", "Здоровʼя та краса",
@@ -227,6 +230,7 @@ final class CategoryDataModel: ObservableObject {
 }
 
 // MARK: - Enum для типів фільтрації
+
 enum CategoryFilterType: String, CaseIterable {
     case count = "За кількістю транзакцій"
     case alphabetical = "За алфавітом"
@@ -242,14 +246,20 @@ func filterIconName(for type: CategoryFilterType) -> String {
 }
 
 // MARK: - Розширення для Transaction
+
 extension Transaction {
     var wrappedId: UUID { id ?? UUID() }
     var validCategory: String { category ?? "Інше" }
 }
 
 // MARK: - TransactionService (бізнес-логіка)
+
 struct TransactionService {
-    static func renameCategory(oldName: String, newName: String, in context: NSManagedObjectContext, categoryDataModel: CategoryDataModel) {
+    
+    static func renameCategory(oldName: String,
+                               newName: String,
+                               in context: NSManagedObjectContext,
+                               categoryDataModel: CategoryDataModel) {
         let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "category == %@", oldName)
         
@@ -271,9 +281,12 @@ struct TransactionService {
         }
     }
     
-    static func addTransaction(firstAmount: Double, firstCurrencyCode: String,
-                               secondAmount: Double, secondCurrencyCode: String,
-                               selectedCategory: String, comment: String,
+    static func addTransaction(firstAmount: Double,
+                               firstCurrencyCode: String,
+                               secondAmount: Double,
+                               secondCurrencyCode: String,
+                               selectedCategory: String,
+                               comment: String,
                                in context: NSManagedObjectContext) -> Bool {
         let newTransaction = Transaction(context: context)
         newTransaction.id = UUID()
@@ -281,9 +294,10 @@ struct TransactionService {
         newTransaction.firstCurrencyCode = firstCurrencyCode
         newTransaction.category = selectedCategory
         newTransaction.comment = comment
+        
         let currentDate = Date()
         newTransaction.date = currentDate
-
+        
         if secondCurrencyCode != "PLN" {
             let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
             request.predicate = NSPredicate(format: "secondCurrencyCode == %@ AND date < %@", "PLN", currentDate as CVarArg)
@@ -318,7 +332,6 @@ struct TransactionService {
             return false
         }
     }
-
     
     // Функція оновлення транзакції
     static func updateTransaction(_ transaction: Transaction,
@@ -332,7 +345,7 @@ struct TransactionService {
                                   currencyManager: CurrencyManager,
                                   in context: NSManagedObjectContext) -> Bool {
         transaction.firstAmount = newFirstAmount
-
+        
         if newSecondCurrencyCode != currencyManager.baseCurrency2 {
             // Шукаємо транзакцію з найближчою датою для конвертації
             if let nearestTxn = currencyManager.nearestTransaction(from: newFirstCurrencyCode,
@@ -356,10 +369,10 @@ struct TransactionService {
             transaction.secondAmount = newSecondAmount
             transaction.secondCurrencyCode = newSecondCurrencyCode
         }
-
+        
         transaction.category = newCategory
         transaction.comment = newComment
-
+        
         do {
             try context.save()
             return true
@@ -368,10 +381,6 @@ struct TransactionService {
             return false
         }
     }
-
-
-
-
     
     static func deleteTransaction(_ transaction: Transaction, in context: NSManagedObjectContext) {
         context.delete(transaction)
@@ -396,7 +405,6 @@ struct TransactionService {
             return "UAH"
         }
     }
-    
     
     // Функція імпорту API транзакцій
     static func importAPITransactions(apiTransactions: [TransactionAPI],
@@ -473,12 +481,6 @@ struct TransactionService {
             print("Error saving API transactions: \(error.localizedDescription)")
         }
     }
-
-
-
-
-
-
 }
 
 extension TransactionService {
@@ -492,7 +494,8 @@ extension TransactionService {
         
         let monobankAPI = MonobankAPI()
         
-        monobankAPI.fetchTransactions(from: startOfMonth.timeIntervalSince1970, to: now.timeIntervalSince1970) { result in
+        monobankAPI.fetchTransactions(from: startOfMonth.timeIntervalSince1970,
+                                      to: now.timeIntervalSince1970) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let data):
@@ -513,7 +516,6 @@ extension TransactionService {
             }
         }
     }
-
     
     static func deleteAllAPITransactions(in context: NSManagedObjectContext, transactions: FetchedResults<Transaction>) {
         transactions.filter { $0.validCategory == "API" }.forEach { transaction in
@@ -526,7 +528,6 @@ extension TransactionService {
         }
     }
 }
-
 
 extension UUID {
     static func uuidFromString(_ string: String) -> UUID {
@@ -573,4 +574,3 @@ func testMonobankAPI() {
         }
     }
 }
- 
