@@ -57,3 +57,4 @@ struct Config {
         return dict["MonobankToken"] as? String
     }
 }
+ 

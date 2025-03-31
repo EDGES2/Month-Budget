@@ -938,3 +938,4 @@ struct TransactionCell: View {
         .listRowBackground(Color.clear)
     }
 }
+ 

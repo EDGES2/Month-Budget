@@ -266,3 +266,4 @@ struct CategoryMaker: View {
         categoryDataModel.colors.removeValue(forKey: category)
     }
 }
+ 

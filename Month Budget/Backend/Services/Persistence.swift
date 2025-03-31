@@ -573,3 +573,4 @@ func testMonobankAPI() {
         }
     }
 }
+ 
