@@ -19,7 +19,7 @@ struct TransactionsMainView: View {
     var body: some View {
         switch selectedCategoryFilter {
         case "Логотип":
-            BudgetSummaryListView(
+            BudgetSummaryView(
                 monthlyBudget: monthlyBudget,
                 transactions: transactions,
                 categoryColor: categoryDataModel.colors["Всі"] ?? .gray
@@ -54,7 +54,7 @@ struct TransactionsMainView: View {
 }
 
 extension TransactionsMainView {
-    struct BudgetSummaryListView: View {
+    struct BudgetSummaryView: View {
         let monthlyBudget: Double
         let transactions: FetchedResults<Transaction>
         let categoryColor: Color
@@ -65,6 +65,9 @@ extension TransactionsMainView {
         @State private var transactionToEdit: Transaction?
         @State private var showTransactionInputSheet: Bool = false
         @State private var showFullTransactionList: Bool = false
+        @State private var showCalendarSheet: Bool = false  // Додано для календаря
+        @State private var selectedDate: Date = Date()
+
 
         private let initialBalance: Double = 29703.54
         private var currencyManager: CurrencyManager {
@@ -113,15 +116,40 @@ extension TransactionsMainView {
         }
 
         var body: some View {
-            ScrollView(.vertical) {
-                LazyVStack(alignment: .center, spacing: 10) {
-                    BudgetSummary(
-                        monthlyBudget: monthlyBudget,
-                        transactions: transactions,
-                        color: categoryColor,
-                        expectedBalance: expectedBalanceUAH,
-                        actualBalance: actualBalanceUAH
-                    )
+                ScrollView(.vertical) {
+                    LazyVStack(alignment: .center, spacing: 10) {
+                        HStack {
+                            Spacer()
+                            BudgetSummary(
+                                monthlyBudget: monthlyBudget,
+                                transactions: transactions,
+                                color: categoryColor,
+                                expectedBalance: expectedBalanceUAH,
+                                actualBalance: actualBalanceUAH
+                            )
+                            Spacer()
+                            HStack {
+                                // Кнопка календаря
+                                Button(action: {
+                                    showCalendarSheet = true
+                                }) {
+                                    Image(systemName: "calendar.badge.clock")
+                                        .font(.system(size: 18))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 10)
+                                
+                                // Інша кнопка
+                                Button(action: { showTransactionInputSheet = true }) {
+                                    Image(systemName: "gearshape")
+                                        .font(.system(size: 18))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 10)
+                            }
+                            .padding(.bottom, 100)
+                        }
+                    
                     Spacer()
                     Button(action: { showTransactionInputSheet = true }) {
                         Text("Додати транзакцію")
@@ -184,22 +212,29 @@ extension TransactionsMainView {
                     .frame(height: showFullTransactionList ? nil : 360)
                     .background(Color.black.opacity(0.2))
                     .cornerRadius(12)
-                }
-                .padding(6)
-            }
-            .sheet(isPresented: $showTransactionInputSheet) {
-                TransactionInput()
-                    .environmentObject(categoryDataModel)
-                    .environmentObject(currencyDataModel)
-                    .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
-            }
-            .sheet(item: $transactionToEdit) { transaction in
-                EditTransaction(transaction: transaction)
-                    .environmentObject(categoryDataModel)
-                    .environmentObject(currencyDataModel)
-                    .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
-            }
-        }
+                    }
+                                .padding(6)
+                            }
+                            // .sheet для TransactionInput
+                            .sheet(isPresented: $showTransactionInputSheet) {
+                                TransactionInput()
+                                    .environmentObject(categoryDataModel)
+                                    .environmentObject(currencyDataModel)
+                                    .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+                            }
+                            // .sheet для редагування транзакції
+                            .sheet(item: $transactionToEdit) { transaction in
+                                EditTransaction(transaction: transaction)
+                                    .environmentObject(categoryDataModel)
+                                    .environmentObject(currencyDataModel)
+                                    .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+                            }
+                            // .sheet для календаря
+                            .sheet(isPresented: $showCalendarSheet) {
+                                CustomCalendarView(selectedDate: $selectedDate)
+                                    // .presentationDetents([.medium, .large])
+                            }
+                        }
 
         struct BudgetSummary: View {
             let monthlyBudget: Double
@@ -222,7 +257,9 @@ extension TransactionsMainView {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
+        //Place for CustomCalendarView
 
+        
         struct TransactionInput: View {
             @Environment(\.managedObjectContext) private var viewContext
             @EnvironmentObject var categoryDataModel: CategoryDataModel
