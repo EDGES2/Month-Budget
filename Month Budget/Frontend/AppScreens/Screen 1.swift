@@ -2,7 +2,7 @@ import SwiftUI
 import CoreData
 
 // MARK: - BudgetSummaryView та супутні компоненти
-extension TransactionsMainView {
+extension AppView {
     struct BudgetSummaryView: View {
         // MARK: - Властивості
         let monthlyBudget: Double
@@ -237,7 +237,7 @@ extension TransactionsMainView {
 
 
 // MARK: - Підкомпоненти для TransactionInput та InputField
-extension TransactionsMainView.BudgetSummaryView {
+extension AppView.BudgetSummaryView {
     struct TransactionInput: View {
         @Environment(\.managedObjectContext) private var viewContext
         @EnvironmentObject var categoryDataModel: CategoryDataModel
@@ -391,3 +391,5 @@ extension TransactionsMainView.BudgetSummaryView {
         }
     }
 }
+
+

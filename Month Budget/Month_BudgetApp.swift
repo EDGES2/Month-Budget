@@ -6,7 +6,7 @@ struct Month_BudgetApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainAppView()
+            AppView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
