@@ -462,26 +462,43 @@ extension TransactionsMainView {
             let currencyManager: CurrencyManager
 
             var body: some View {
-                let filteredTransactions = transactions.filter { $0.validCategory == category }
-                let totalUAH = PersistenceController.shared.totalExpenses(
-                    for: filteredTransactions,
-                    targetCurrency: currencyManager.baseCurrency1,
-                    currencyManager: currencyManager
-                )
-                let totalPLN = PersistenceController.shared.totalExpenses(
-                    for: filteredTransactions,
-                    targetCurrency: currencyManager.baseCurrency2,
-                    currencyManager: currencyManager
-                )
-                let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
-                return SummaryView(
-                    title: category,
-                    amountUAH: totalUAH,
-                    amountPLN: totalPLN,
-                    rate: rate,
-                    color: color
-                )
-            }
+                            let filteredTransactions = transactions.filter { $0.validCategory == category }
+                            let totalUAH: Double
+                            let totalPLN: Double
+                            
+                            if category == "На інший рахунок" {
+                                totalUAH = PersistenceController.shared.totalToOtherAccount(
+                                    for: filteredTransactions,
+                                    targetCurrency: currencyManager.baseCurrency1,
+                                    currencyManager: currencyManager
+                                )
+                                totalPLN = PersistenceController.shared.totalToOtherAccount(
+                                    for: filteredTransactions,
+                                    targetCurrency: currencyManager.baseCurrency2,
+                                    currencyManager: currencyManager
+                                )
+                            } else {
+                                totalUAH = PersistenceController.shared.totalExpenses(
+                                    for: filteredTransactions,
+                                    targetCurrency: currencyManager.baseCurrency1,
+                                    currencyManager: currencyManager
+                                )
+                                totalPLN = PersistenceController.shared.totalExpenses(
+                                    for: filteredTransactions,
+                                    targetCurrency: currencyManager.baseCurrency2,
+                                    currencyManager: currencyManager
+                                )
+                            }
+                            
+                            let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
+                            return SummaryView(
+                                title: category,
+                                amountUAH: totalUAH,
+                                amountPLN: totalPLN,
+                                rate: rate,
+                                color: color
+                            )
+                        }
         }
 
         struct SummaryView: View {
@@ -590,6 +607,7 @@ extension TransactionsMainView {
             let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
             return VStack {
                 CategoryHeader(
+                    selectedCategory: selectedCategoryFilter,
                     transactions: filteredTransactions,
                     color: categoryDataModel.colors[selectedCategoryFilter] ?? .gray,
                     currencyManager: currencyManager
@@ -623,21 +641,37 @@ extension TransactionsMainView {
         }
 
         struct CategoryHeader: View {
+            let selectedCategory: String
             let transactions: [Transaction]
             let color: Color
             let currencyManager: CurrencyManager
 
             var body: some View {
-                // Обчислюємо загальну суму витрат у UAH (без конвертації, напр. використовуючи firstAmount)
-                let totalUAH = PersistenceController.shared.totalExpenses(for: transactions, targetCurrency: currencyManager.baseCurrency1, currencyManager: currencyManager)
-                let totalPLN = PersistenceController.shared.totalExpenses(for: transactions, targetCurrency: currencyManager.baseCurrency2, currencyManager: currencyManager)
-
-                // Якщо totalPLN не 0, можна обчислити "курс", наприклад, як відношення totalUAH до totalPLN
+                let isOtherAccount = selectedCategory == "На інший рахунок"
+                
+                let totalUAH = isOtherAccount ?
+                    PersistenceController.shared.totalToOtherAccount(for: transactions,
+                                                                     targetCurrency: currencyManager.baseCurrency1,
+                                                                     currencyManager: currencyManager)
+                    :
+                    PersistenceController.shared.totalExpenses(for: transactions,
+                                                               targetCurrency: currencyManager.baseCurrency1,
+                                                               currencyManager: currencyManager)
+                
+                let totalPLN = isOtherAccount ?
+                    PersistenceController.shared.totalToOtherAccount(for: transactions,
+                                                                     targetCurrency: currencyManager.baseCurrency2,
+                                                                     currencyManager: currencyManager)
+                    :
+                    PersistenceController.shared.totalExpenses(for: transactions,
+                                                               targetCurrency: currencyManager.baseCurrency2,
+                                                               currencyManager: currencyManager)
+                
                 let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
-
+                
                 return VStack(spacing: 8) {
-                    Text("Загальна сума витрат в UAH: \(totalUAH, format: .number.precision(.fractionLength(2)))")
-                    Text("Загальна сума витрат в PLN: \(totalPLN, format: .number.precision(.fractionLength(2)))")
+                    Text("Загальна сума \(isOtherAccount ? "переведень" : "витрат") в UAH: \(totalUAH, format: .number.precision(.fractionLength(2)))")
+                    Text("Загальна сума \(isOtherAccount ? "переведень" : "витрат") в PLN: \(totalPLN, format: .number.precision(.fractionLength(2)))")
                     Text("Курс: \(rate, format: .number.precision(.fractionLength(2)))")
                 }
                 .padding()
