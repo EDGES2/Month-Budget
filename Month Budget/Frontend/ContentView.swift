@@ -24,6 +24,14 @@ struct MainAppView: View {
     }
 }
 
+// MARK: - Попередній перегляд MainAppView
+//struct MainAppView_Previews: PreviewProvider {
+//    static var previews: some View {
+//        MainAppView()
+//            .frame(minWidth: 800, minHeight: 600) // типові розміри для MacBook
+//    }
+//}
+
 // MARK: - Text Extensions for стилізацію кнопок
 extension Text {
     func categoryButtonStyle(isSelected: Bool, color: Color) -> some View {

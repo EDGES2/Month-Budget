@@ -130,9 +130,9 @@ struct CustomCalendarView: View {
     }
 }
 
-//struct CustomCalendarView_Previews: PreviewProvider {
-//    @State static var date = Date()
-//    static var previews: some View {
-//        CustomCalendarView(selectedDate: $date)
-//    }
-//}
+struct CustomCalendarView_Previews: PreviewProvider {
+    @State static var date = Date()
+    static var previews: some View {
+        CustomCalendarView(selectedDate: $date)
+    }
+}
