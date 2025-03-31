@@ -84,18 +84,15 @@ struct Categories: View {
             let sortedOthers = others.sorted()
             return [first, replenishment, api] + sortedOthers
         case .expenses:
-            // Для сортування за витратами використовуємо першу суму (firstAmount) і конвертуємо суму у базову валюту ("UAH")
-            let currencyManager = CurrencyManager() // Створюємо тимчасовий менеджер валют
+            // У Sidebar всі транзакції мають валюту UAH – тому просто сумуємо firstAmount
             let sortedOthers = others.sorted { lhs, rhs in
                 let lhsExpenses = transactions.filter { $0.validCategory == lhs }
                     .reduce(0) { total, txn in
-                        let txnCurrency = txn.firstCurrencyCode ?? currencyManager.baseCurrencyCode
-                        return total + currencyManager.convert(amount: txn.firstAmount, from: txnCurrency, to: "UAH")
+                        total + txn.firstAmount
                     }
                 let rhsExpenses = transactions.filter { $0.validCategory == rhs }
                     .reduce(0) { total, txn in
-                        let txnCurrency = txn.firstCurrencyCode ?? currencyManager.baseCurrencyCode
-                        return total + currencyManager.convert(amount: txn.firstAmount, from: txnCurrency, to: "UAH")
+                        total + txn.firstAmount
                     }
                 return lhsExpenses > rhsExpenses
             }

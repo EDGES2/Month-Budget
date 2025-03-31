@@ -7,14 +7,14 @@ struct TransactionsMainView: View {
     @Binding var categoryFilterType: CategoryFilterType
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
-    
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)],
         animation: .default
     ) private var transactions: FetchedResults<Transaction>
-    
+
     private let monthlyBudget: Double = 20000.0
-    
+
     var body: some View {
         switch selectedCategoryFilter {
         case "Логотип":
@@ -36,7 +36,8 @@ struct TransactionsMainView: View {
         case "API":
             APITransactionsView(
                 transactions: transactions,
-                categoryDataModel: categoryDataModel
+                categoryDataModel: categoryDataModel,
+                currencyManager: CurrencyManager()
             )
         default:
             SelectedCategoryDetailsView(
@@ -52,46 +53,57 @@ extension TransactionsMainView {
         let monthlyBudget: Double
         let transactions: FetchedResults<Transaction>
         let categoryColor: Color
-        
+
         @EnvironmentObject var categoryDataModel: CategoryDataModel
-        @Environment(\.managedObjectContext) private var viewContext  // Додано контекст Core Data
+        @Environment(\.managedObjectContext) private var viewContext
         @State private var transactionToEdit: Transaction?
         @State private var showTransactionInputSheet: Bool = false
         @State private var showFullTransactionList: Bool = false
-        
+
         private let initialBalance: Double = 29703.54
         private let currencyManager = CurrencyManager()
-        
-        // Викликаємо методи з PersistenceController для розрахунків
+
+        // Використовуємо нові функції з параметрами targetCurrency та currencyManager
         private var totalExpensesUAH: Double {
-            PersistenceController.shared.totalExpenses(for: transactions, in: "UAH", using: currencyManager)
+            PersistenceController.shared.totalExpenses(
+                for: transactions.map { $0 },
+                targetCurrency: currencyManager.baseCurrency1,
+                currencyManager: currencyManager
+            )
         }
-        
+
         private var totalReplenishmentUAH: Double {
-            PersistenceController.shared.totalReplenishment(for: transactions, in: "UAH", using: currencyManager)
+            PersistenceController.shared.totalReplenishment(
+                for: transactions.map { $0 },
+                targetCurrency: currencyManager.baseCurrency1,
+                currencyManager: currencyManager
+            )
         }
-        
+
         private var totalToOtherAccountUAH: Double {
-            PersistenceController.shared.totalToOtherAccount(for: transactions, in: "UAH", using: currencyManager)
+            PersistenceController.shared.totalToOtherAccount(
+                for: transactions.map { $0 },
+                targetCurrency: currencyManager.baseCurrency1,
+                currencyManager: currencyManager
+            )
         }
-        
+
         private var averageRate: Double {
-            PersistenceController.shared.averageExchangeRate(for: transactions, baseCurrency: "UAH", using: currencyManager)
+            PersistenceController.shared.overallAverageExchangeRate(for: transactions.map { $0 })
         }
-        
+
         private var expectedBalanceUAH: Double {
             monthlyBudget - totalExpensesUAH
         }
-        
+
         private var actualBalanceUAH: Double {
             initialBalance + totalReplenishmentUAH - totalExpensesUAH - totalToOtherAccountUAH
         }
-        
-        // Функція для видалення транзакції
+
         private func deleteTransaction(_ transaction: Transaction) {
             TransactionService.deleteTransaction(transaction, in: viewContext)
         }
-        
+
         var body: some View {
             ScrollView(.vertical) {
                 LazyVStack(alignment: .center, spacing: 10) {
@@ -112,7 +124,7 @@ extension TransactionsMainView {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.bottom, 10)
-                    
+
                     VStack(alignment: .leading) {
                         HStack {
                             Text("Історія транзакцій:")
@@ -130,7 +142,7 @@ extension TransactionsMainView {
                         .padding(.top, 10)
                         .padding(.horizontal, 5)
                         Divider()
-                        
+
                         if showFullTransactionList {
                             ScrollView(.vertical) {
                                 LazyVStack(spacing: 10) {
@@ -177,14 +189,14 @@ extension TransactionsMainView {
                     .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
             }
         }
-        
+
         struct BudgetSummary: View {
             let monthlyBudget: Double
             let transactions: FetchedResults<Transaction>
             let color: Color
             let expectedBalance: Double
             let actualBalance: Double
-            
+
             var body: some View {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
@@ -199,28 +211,25 @@ extension TransactionsMainView {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
-        
+
         struct TransactionInput: View {
             @Environment(\.managedObjectContext) private var viewContext
             @EnvironmentObject var categoryDataModel: CategoryDataModel
             @Environment(\.presentationMode) var presentationMode
-            
-            // Два поля для введення сум та відповідні коди валюти
+
             @State private var firstAmount = ""
             @State private var secondAmount = ""
             @State private var firstCurrencyCode = "UAH"
             @State private var secondCurrencyCode = "PLN"
             @State private var selectedCategory = "Їжа"
             @State private var comment = ""
-            
+
             private let currencyManager = CurrencyManager()
-            
+
             var body: some View {
                 NavigationStack {
                     VStack(alignment: .center, spacing: 12) {
-                        // Поле введення для першої суми
                         InputField(title: "Сума", text: $firstAmount)
-                        // Picker для вибору коду валюти для першої суми
                         Picker("Валюта", selection: $firstCurrencyCode) {
                             ForEach(Array(currencyManager.currencies.keys), id: \.self) { code in
                                 if let symbol = currencyManager.currencies[code]?.symbol {
@@ -231,10 +240,8 @@ extension TransactionsMainView {
                             }
                         }
                         .pickerStyle(MenuPickerStyle())
-                        
-                        // Поле введення для другої суми
+
                         InputField(title: "Сума", text: $secondAmount)
-                        // Picker для вибору коду валюти для другої суми
                         Picker("Валюта", selection: $secondCurrencyCode) {
                             ForEach(Array(currencyManager.currencies.keys), id: \.self) { code in
                                 if let symbol = currencyManager.currencies[code]?.symbol {
@@ -245,8 +252,7 @@ extension TransactionsMainView {
                             }
                         }
                         .pickerStyle(MenuPickerStyle())
-                        
-                        // Вибір категорії
+
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Категорія:")
                                 .font(.caption)
@@ -268,12 +274,12 @@ extension TransactionsMainView {
                                 }
                             }
                         }
-                        
+
                         TextField("Коментар", text: $comment)
                             .padding(8)
                             .background(Color.gray.opacity(0.2))
                             .cornerRadius(8)
-                        
+
                         Button(action: addTransaction) {
                             Text("Зберегти транзакцію")
                                 .transactionButtonStyle(
@@ -289,29 +295,31 @@ extension TransactionsMainView {
                     .shadow(radius: 5)
                 }
             }
-            
+
             private var cardBackground: Color {
                 Color(NSColor.windowBackgroundColor)
             }
-            
+
             private func closeView() {
                 presentationMode.wrappedValue.dismiss()
             }
-            
+
             private func addTransaction() {
                 guard let firstAmt = Double(firstAmount),
                       let secondAmt = Double(secondAmount) else {
                     print("Невірний формат суми")
                     return
                 }
-                
-                let success = TransactionService.addTransaction(firstAmount: firstAmt,
-                                                                firstCurrencyCode: firstCurrencyCode,
-                                                                secondAmount: secondAmt,
-                                                                secondCurrencyCode: secondCurrencyCode,
-                                                                selectedCategory: selectedCategory,
-                                                                comment: comment,
-                                                                in: viewContext)
+
+                let success = TransactionService.addTransaction(
+                    firstAmount: firstAmt,
+                    firstCurrencyCode: firstCurrencyCode,
+                    secondAmount: secondAmt,
+                    secondCurrencyCode: secondCurrencyCode,
+                    selectedCategory: selectedCategory,
+                    comment: comment,
+                    in: viewContext
+                )
                 if success {
                     firstAmount = ""
                     secondAmount = ""
@@ -319,11 +327,11 @@ extension TransactionsMainView {
                     closeView()
                 }
             }
-            
+
             struct InputField: View {
                 let title: String
                 @Binding var text: String
-                
+
                 var body: some View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title)
@@ -352,10 +360,9 @@ extension TransactionsMainView {
         @EnvironmentObject var categoryDataModel: CategoryDataModel
         @Binding var categoryFilterType: CategoryFilterType
         private let currencyManager = CurrencyManager()
-        
+
         private var sortedCategories: [String] {
             let categories = categoryDataModel.filterOptions.filter { $0 != "Поповнення" && $0 != "API" && $0 != "Всі" }
-            
             switch categoryFilterType {
             case .count:
                 return categories.sorted { lhs, rhs in
@@ -369,17 +376,19 @@ extension TransactionsMainView {
                 return categories.sorted { lhs, rhs in
                     let lhsExpenses = PersistenceController.shared.totalExpenses(
                         for: transactions.filter { $0.validCategory == lhs },
-                        in: "UAH", using: currencyManager
+                        targetCurrency: currencyManager.baseCurrency1,
+                        currencyManager: currencyManager
                     )
                     let rhsExpenses = PersistenceController.shared.totalExpenses(
                         for: transactions.filter { $0.validCategory == rhs },
-                        in: "UAH", using: currencyManager
+                        targetCurrency: currencyManager.baseCurrency1,
+                        currencyManager: currencyManager
                     )
                     return lhsExpenses > rhsExpenses
                 }
             }
         }
-        
+
         var body: some View {
             List {
                 totalExpensesSummary
@@ -395,26 +404,25 @@ extension TransactionsMainView {
             }
             .listStyle(PlainListStyle())
         }
-        
+
         private var totalExpensesSummary: some View {
+            let filteredTransactions = transactions.filter {
+                $0.validCategory != "Поповнення" &&
+                $0.validCategory != "На інший рахунок" &&
+                $0.validCategory != "API"
+            }
             let totalUAH = PersistenceController.shared.totalExpenses(
-                for: transactions.filter {
-                    $0.validCategory != "Поповнення" &&
-                    $0.validCategory != "На інший рахунок" &&
-                    $0.validCategory != "API"
-                },
-                in: "UAH", using: currencyManager
+                for: filteredTransactions,
+                targetCurrency: currencyManager.baseCurrency1,
+                currencyManager: currencyManager
             )
             let totalPLN = PersistenceController.shared.totalExpenses(
-                for: transactions.filter {
-                    $0.validCategory != "Поповнення" &&
-                    $0.validCategory != "На інший рахунок" &&
-                    $0.validCategory != "API"
-                },
-                in: "PLN", using: currencyManager
+                for: filteredTransactions,
+                targetCurrency: currencyManager.baseCurrency2,
+                currencyManager: currencyManager
             )
             let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
-            
+
             return SummaryView(
                 title: "Усі витрати",
                 amountUAH: totalUAH,
@@ -423,18 +431,21 @@ extension TransactionsMainView {
                 color: categoryDataModel.colors["Всі"] ?? .gray
             )
         }
-        
+
         private var replenishmentSummary: some View {
+            let filteredTransactions = transactions.filter { $0.validCategory == "Поповнення" }
             let totalUAH = PersistenceController.shared.totalReplenishment(
-                for: transactions.filter { $0.validCategory == "Поповнення" },
-                in: "UAH", using: currencyManager
+                for: filteredTransactions,
+                targetCurrency: currencyManager.baseCurrency1,
+                currencyManager: currencyManager
             )
             let totalPLN = PersistenceController.shared.totalReplenishment(
-                for: transactions.filter { $0.validCategory == "Поповнення" },
-                in: "PLN", using: currencyManager
+                for: filteredTransactions,
+                targetCurrency: currencyManager.baseCurrency2,
+                currencyManager: currencyManager
             )
             let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
-            
+
             return SummaryView(
                 title: "Поповнення",
                 amountUAH: totalUAH,
@@ -443,21 +454,24 @@ extension TransactionsMainView {
                 color: categoryDataModel.colors["Поповнення"] ?? .gray
             )
         }
-        
+
         struct CategoryExpenseSummary: View {
             let category: String
             let transactions: FetchedResults<Transaction>
             let color: Color
             let currencyManager: CurrencyManager
-            
+
             var body: some View {
+                let filteredTransactions = transactions.filter { $0.validCategory == category }
                 let totalUAH = PersistenceController.shared.totalExpenses(
-                    for: transactions.filter { $0.validCategory == category },
-                    in: "UAH", using: currencyManager
+                    for: filteredTransactions,
+                    targetCurrency: currencyManager.baseCurrency1,
+                    currencyManager: currencyManager
                 )
                 let totalPLN = PersistenceController.shared.totalExpenses(
-                    for: transactions.filter { $0.validCategory == category },
-                    in: "PLN", using: currencyManager
+                    for: filteredTransactions,
+                    targetCurrency: currencyManager.baseCurrency2,
+                    currencyManager: currencyManager
                 )
                 let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
                 return SummaryView(
@@ -469,14 +483,14 @@ extension TransactionsMainView {
                 )
             }
         }
-        
+
         struct SummaryView: View {
             let title: String
             let amountUAH: Double
             let amountPLN: Double
             let rate: Double
             let color: Color
-            
+
             var body: some View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -510,9 +524,8 @@ extension TransactionsMainView {
         @EnvironmentObject var categoryDataModel: CategoryDataModel
         @State private var transactionToEdit: Transaction?
         private let currencyManager = CurrencyManager()
-        
+
         var body: some View {
-            // Фільтруємо транзакції за категорією "Поповнення"
             let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
             return VStack {
                 ReplenishmentHeader(
@@ -536,7 +549,7 @@ extension TransactionsMainView {
                     .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
             }
         }
-        
+
         private func deleteTransaction(_ transaction: Transaction) {
             let viewContext = PersistenceController.shared.container.viewContext
             viewContext.delete(transaction)
@@ -546,15 +559,14 @@ extension TransactionsMainView {
                 print("Помилка видалення: \(error.localizedDescription)")
             }
         }
-        
+
         struct ReplenishmentHeader: View {
             let transactions: [Transaction]
             let color: Color
             let currencyManager: CurrencyManager
-            
+
             var body: some View {
-                // Виклик методу з PersistenceController для розрахунку поповнень
-                let totalUAH = PersistenceController.shared.totalReplenishment(for: transactions, in: "UAH", using: currencyManager)
+                let totalUAH = PersistenceController.shared.totalReplenishment(for: transactions, targetCurrency: currencyManager.baseCurrency1, currencyManager: currencyManager)
                 return VStack(spacing: 8) {
                     Text("Загальна сума поповнень в UAH: \(totalUAH, format: .number.precision(.fractionLength(2)))")
                 }
@@ -566,7 +578,6 @@ extension TransactionsMainView {
     }
 }
 
-
 extension TransactionsMainView {
     struct SelectedCategoryDetailsView: View {
         let transactions: FetchedResults<Transaction>
@@ -574,7 +585,7 @@ extension TransactionsMainView {
         @EnvironmentObject var categoryDataModel: CategoryDataModel
         @State private var transactionToEdit: Transaction?
         private let currencyManager = CurrencyManager()
-        
+
         var body: some View {
             let filteredTransactions = transactions.filter { $0.validCategory == selectedCategoryFilter }
             return VStack {
@@ -600,7 +611,7 @@ extension TransactionsMainView {
                     .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
             }
         }
-        
+
         private func deleteTransaction(_ transaction: Transaction) {
             let viewContext = PersistenceController.shared.container.viewContext
             viewContext.delete(transaction)
@@ -610,22 +621,20 @@ extension TransactionsMainView {
                 print("Помилка видалення: \(error.localizedDescription)")
             }
         }
-        
+
         struct CategoryHeader: View {
             let transactions: [Transaction]
             let color: Color
             let currencyManager: CurrencyManager
-            
+
             var body: some View {
-                let totalUAH = PersistenceController.shared.totalExpenses(
-                    for: transactions,
-                    in: "UAH", using: currencyManager
-                )
-                let totalPLN = PersistenceController.shared.totalExpenses(
-                    for: transactions,
-                    in: "PLN", using: currencyManager
-                )
+                // Обчислюємо загальну суму витрат у UAH (без конвертації, напр. використовуючи firstAmount)
+                let totalUAH = PersistenceController.shared.totalExpenses(for: transactions, targetCurrency: currencyManager.baseCurrency1, currencyManager: currencyManager)
+                let totalPLN = PersistenceController.shared.totalExpenses(for: transactions, targetCurrency: currencyManager.baseCurrency2, currencyManager: currencyManager)
+
+                // Якщо totalPLN не 0, можна обчислити "курс", наприклад, як відношення totalUAH до totalPLN
                 let rate = totalPLN != 0 ? totalUAH / totalPLN : 0.0
+
                 return VStack(spacing: 8) {
                     Text("Загальна сума витрат в UAH: \(totalUAH, format: .number.precision(.fractionLength(2)))")
                     Text("Загальна сума витрат в PLN: \(totalPLN, format: .number.precision(.fractionLength(2)))")
@@ -644,9 +653,10 @@ extension TransactionsMainView {
     struct APITransactionsView: View {
         let transactions: FetchedResults<Transaction>
         let categoryDataModel: CategoryDataModel
+        let currencyManager: CurrencyManager  // Додаємо менеджер валют
         @Environment(\.managedObjectContext) private var viewContext
         @State private var transactionToEdit: Transaction?
-        
+
         var body: some View {
             VStack {
                 HStack {
@@ -661,8 +671,9 @@ extension TransactionsMainView {
                     }
                     .buttonStyle(.plain)
                     .help("Видалити всі транзакції категорії API")
-                    
+
                     Button(action: {
+                        // Передаємо currencyManager у функцію fetchAPITransactions
                         TransactionService.fetchAPITransactions(in: viewContext)
                     }) {
                         Image(systemName: "arrow.clockwise")
@@ -672,7 +683,7 @@ extension TransactionsMainView {
                     .help("Оновити транзакції з API")
                 }
                 .padding()
-                
+
                 List {
                     ForEach(transactions.filter { $0.validCategory == "API" }, id: \.wrappedId) { transaction in
                         TransactionCell(
@@ -694,7 +705,6 @@ extension TransactionsMainView {
 }
 
 
-// MARK: - Global Shared Views
 struct EditTransaction: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var categoryDataModel: CategoryDataModel
@@ -708,6 +718,7 @@ struct EditTransaction: View {
     @State private var selectedSecondCurrency: String
     @State private var selectedCategory: String
     @State private var editedComment: String
+    @StateObject var currencyManager = CurrencyManager()
 
     init(transaction: Transaction) {
         self.transaction = transaction
@@ -760,8 +771,12 @@ struct EditTransaction: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.headline)
             Picker("", selection: selection) {
-                ForEach(["UAH", "PLN"], id: \.self) { code in
-                    Text(code)
+                ForEach(Array(currencyManager.currencies.keys), id: \.self) { code in
+                    if let symbol = currencyManager.currencies[code]?.symbol {
+                        Text("\(code) (\(symbol))")
+                    } else {
+                        Text(code)
+                    }
                 }
             }
             .pickerStyle(MenuPickerStyle())
@@ -791,7 +806,16 @@ struct EditTransaction: View {
     private func saveChanges() {
         guard let firstAmt = Double(editedFirstAmount),
               let secondAmt = Double(editedSecondAmount) else { return }
-
+        
+        // Отримуємо всі транзакції з viewContext для пошуку актуального курсу конвертації
+        let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+        var transactionsArray: [Transaction] = []
+        do {
+            transactionsArray = try viewContext.fetch(request)
+        } catch {
+            print("Помилка отримання транзакцій: \(error.localizedDescription)")
+        }
+        
         let success = TransactionService.updateTransaction(
             transaction,
             newFirstAmount: firstAmt,
@@ -800,15 +824,16 @@ struct EditTransaction: View {
             newSecondCurrencyCode: selectedSecondCurrency,
             newCategory: selectedCategory,
             newComment: editedComment,
+            transactions: transactionsArray,      // Передаємо масив транзакцій
+            currencyManager: currencyManager,       // Передаємо об’єкт CurrencyManager
             in: viewContext
         )
         if success {
             closeView()
         }
     }
+
 }
-
-
 
 struct TransactionCell: View {
     let transaction: Transaction
@@ -816,7 +841,8 @@ struct TransactionCell: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     private let currencyManager = CurrencyManager()
-    
+    private let viewContext = PersistenceController.shared.container.viewContext
+
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -824,22 +850,29 @@ struct TransactionCell: View {
         return formatter
     }
 
+    private var displaySecondAmount: Double {
+        transaction.secondAmount
+    }
+
+    private var displaySecondSymbol: String {
+        let secondCode = transaction.secondCurrencyCode ?? currencyManager.baseCurrency1
+        if secondCode == currencyManager.baseCurrency2 {
+            return currencyManager.currencies[currencyManager.baseCurrency2]?.symbol ?? currencyManager.baseCurrency2
+        } else {
+            return currencyManager.currencies[secondCode]?.symbol ?? secondCode
+        }
+    }
+
     var body: some View {
-        // Отримуємо коди валют із транзакції, або базовий, якщо не вказано
-        let firstCode = transaction.firstCurrencyCode ?? currencyManager.baseCurrencyCode
-        let secondCode = transaction.secondCurrencyCode ?? currencyManager.baseCurrencyCode
+        let firstCode = transaction.firstCurrencyCode ?? currencyManager.baseCurrency1
         let firstCurrencyInfo = currencyManager.currencies[firstCode]
-        let secondCurrencyInfo = currencyManager.currencies[secondCode]
-        
+
         return HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading) {
-                // Відображення першої суми з відповідним символом валюти
                 Text("\(transaction.firstAmount, specifier: "%.2f") \(firstCurrencyInfo?.symbol ?? firstCode)")
                     .font(.headline)
-                // Відображення другої суми з відповідним символом валюти
-                Text("\(transaction.secondAmount, specifier: "%.2f") \(secondCurrencyInfo?.symbol ?? secondCode)")
-                // Розрахунок курсу як відношення першої суми до другої (якщо друга не 0)
-                Text("Курс: \(transaction.secondAmount != 0 ? (transaction.firstAmount / transaction.secondAmount) : 0, specifier: "%.2f")")
+                Text("\(displaySecondAmount, specifier: "%.2f") \(displaySecondSymbol)")
+                Text("Курс: \(displaySecondAmount != 0 ? (transaction.firstAmount / displaySecondAmount) : 0, specifier: "%.2f")")
                 Text(transaction.date ?? Date(), formatter: dateFormatter)
                     .font(.footnote)
                     .foregroundColor(.secondary)
@@ -855,7 +888,7 @@ struct TransactionCell: View {
                     Image(systemName: "pencil")
                 }
                 .buttonStyle(.plain)
-                
+
                 Button(action: onDelete) {
                     Image(systemName: "trash")
                 }
@@ -870,6 +903,4 @@ struct TransactionCell: View {
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
     }
-
-
 }

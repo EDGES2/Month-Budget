@@ -7,34 +7,77 @@ import CryptoKit
 struct CurrencyInfo {
     let code: String       // Наприклад, "UAH", "PLN"
     let symbol: String     // Наприклад, "₴", "zł"
-    let exchangeRateToBase: Double  // Курс конвертації до базової валюти
+    let exchangeRateToBase: Double = 1.0
 }
 
-// MARK: - Currency Manager
-
-// Додамо нові валюти до CurrencyManager
 class CurrencyManager: ObservableObject {
     @Published var currencies: [String: CurrencyInfo] = [:]
-    let baseCurrencyCode: String
-
-    init(baseCurrencyCode: String = "UAH") {
-        self.baseCurrencyCode = baseCurrencyCode
-        currencies["UAH"] = CurrencyInfo(code: "UAH", symbol: "₴", exchangeRateToBase: 1.0)
-        currencies["PLN"] = CurrencyInfo(code: "PLN", symbol: "zł", exchangeRateToBase: 0.14)
-        // Додаємо долар та євро (значення exchangeRateToBase встановлено умовно)
-        currencies["USD"] = CurrencyInfo(code: "USD", symbol: "$", exchangeRateToBase: 0.037)
-        currencies["EUR"] = CurrencyInfo(code: "EUR", symbol: "€", exchangeRateToBase: 0.033)
+    
+    var baseCurrency1: String
+    
+    // baseCurrency2 завжди повертає "PLN"
+    var baseCurrency2: String {
+        return "PLN"
+    }
+    
+    init(baseCurrency1: String = "UAH") {
+        self.baseCurrency1 = baseCurrency1
+        
+        // Ініціалізуємо словник валют з потрібними кодами та символами
+        currencies[baseCurrency1] = CurrencyInfo(code: baseCurrency1, symbol: "₴")
+        // Для PLN використовуємо як код, так і символ "PLN"
+        currencies["PLN"] = CurrencyInfo(code: "PLN", symbol: "zł")
+        currencies["USD"] = CurrencyInfo(code: "USD", symbol: "$")
+        currencies["EUR"] = CurrencyInfo(code: "EUR", symbol: "€")
         // Інші валюти додаються за потребою
     }
     
-    /// Конвертує суму з однієї валюти в іншу через базову валюту
-    func convert(amount: Double, from sourceCode: String, to targetCode: String) -> Double {
-        guard let source = currencies[sourceCode],
-              let target = currencies[targetCode] else { return amount }
-        let amountInBase = amount * source.exchangeRateToBase
-        return amountInBase / target.exchangeRateToBase
+    /// Шукає курс конвертації з валюти from у валюту to за даними транзакцій.
+    /// Функція повертає курс (firstAmount/secondAmount) з останньої транзакції,
+    /// де перша валюта дорівнює from, а друга – to. Якщо така транзакція не знайдена, повертає nil.
+    func conversionRate(from: String, to: String, transactions: [Transaction]) -> Double? {
+        let filtered = transactions.filter { txn in
+            txn.firstCurrencyCode == from && txn.secondCurrencyCode == to && txn.secondAmount != 0
+        }
+        let sorted = filtered.sorted {
+            ($0.date ?? Date.distantPast) > ($1.date ?? Date.distantPast)
+        }
+        if let txn = sorted.first {
+            return txn.firstAmount / txn.secondAmount
+        }
+        return nil
+    }
+    
+    /// Конвертує транзакцію до бажаної валюти для розрахункових підсумків.
+    /// Якщо друга валюта транзакції відповідає targetCurrency, повертає transaction.secondAmount.
+    /// Інакше шукає курс конвертації з базової валюти baseCurrency1 до targetCurrency
+    /// та повертає значення transaction.firstAmount, поділене на знайдений курс.
+    func convert(transaction: Transaction, to targetCurrency: String, using transactions: [Transaction]) -> Double {
+        if transaction.secondCurrencyCode == targetCurrency {
+            return transaction.secondAmount
+        } else {
+            if let rate = conversionRate(from: baseCurrency1, to: targetCurrency, transactions: transactions), rate != 0 {
+                return transaction.firstAmount / rate
+            }
+        }
+        return 0
     }
 }
+// Додамо допоміжний метод у розширенні CurrencyManager для пошуку транзакції з мінімальною різницею дат
+extension CurrencyManager {
+    /// Повертає транзакцію з валютою from та to, дата якої найбільше наближена до заданої дати.
+    func nearestTransaction(from: String, to: String, forDate date: Date, transactions: [Transaction]) -> Transaction? {
+        let filtered = transactions.filter { txn in
+            txn.firstCurrencyCode == from && txn.secondCurrencyCode == to && txn.secondAmount != 0
+        }
+        return filtered.min(by: {
+            let diff1 = abs(($0.date ?? Date.distantPast).timeIntervalSince(date))
+            let diff2 = abs(($1.date ?? Date.distantPast).timeIntervalSince(date))
+            return diff1 < diff2
+        })
+    }
+}
+
 
 
 // MARK: - Persistence Controller
@@ -57,65 +100,105 @@ struct PersistenceController {
 // MARK: - Обчислення для транзакцій (уніфіковані за новими атрибутами)
 
 extension PersistenceController {
-    
-    /// Обчислює загальну суму витрат (для транзакцій, що НЕ є поповненням, переказом чи API) в заданій валюті.
-    func totalExpenses<T: Collection>(for transactions: T, in targetCurrency: String, using currencyManager: CurrencyManager) -> Double where T.Element == Transaction {
-        transactions.filter {
-            guard let category = $0.category else { return true }
-            return category != "Поповнення" && category != "На інший рахунок" && category != "API"
+    // Підрахунок витрат (не включаючи "Поповнення", "На інший рахунок" та "API")
+    func totalExpenses(for transactions: [Transaction],
+                       targetCurrency: String,
+                       currencyManager: CurrencyManager) -> Double {
+        let expenseTransactions = transactions.filter { txn in
+            let cat = txn.validCategory
+            return cat != "Поповнення" && cat != "На інший рахунок" && cat != "API"
         }
-        .reduce(0) { total, transaction in
-            // Використовуємо першу пару (firstAmount, firstCurrencyCode) як основну для розрахунків
-            let txnCurrency = transaction.firstCurrencyCode ?? currencyManager.baseCurrencyCode
-            let convertedAmount = currencyManager.convert(amount: transaction.firstAmount, from: txnCurrency, to: targetCurrency)
-            return total + convertedAmount
-        }
-    }
-
-    /// Обчислює загальну суму поповнень в заданій валюті.
-    func totalReplenishment<T: Collection>(for transactions: T, in targetCurrency: String, using currencyManager: CurrencyManager) -> Double where T.Element == Transaction {
-        transactions.filter { $0.category == "Поповнення" }
-            .reduce(0) { total, transaction in
-                let txnCurrency = transaction.firstCurrencyCode ?? currencyManager.baseCurrencyCode
-                let convertedAmount = currencyManager.convert(amount: transaction.firstAmount, from: txnCurrency, to: targetCurrency)
-                return total + convertedAmount
+        if targetCurrency == currencyManager.baseCurrency1 {
+            return expenseTransactions.reduce(0) { total, txn in
+                total + txn.firstAmount
             }
-    }
-    
-    /// Обчислює загальну суму переказів (на інший рахунок) в заданій валюті.
-    func totalToOtherAccount<T: Collection>(for transactions: T, in targetCurrency: String, using currencyManager: CurrencyManager) -> Double where T.Element == Transaction {
-        transactions.filter { $0.category == "На інший рахунок" }
-            .reduce(0) { total, transaction in
-                let txnCurrency = transaction.firstCurrencyCode ?? currencyManager.baseCurrencyCode
-                let convertedAmount = currencyManager.convert(amount: transaction.firstAmount, from: txnCurrency, to: targetCurrency)
-                return total + convertedAmount
+        } else {
+            return expenseTransactions.reduce(0) { total, txn in
+                total + currencyManager.convert(transaction: txn, to: targetCurrency, using: expenseTransactions)
             }
-    }
-    
-    /// Обчислює очікуваний баланс (бюджет мінус витрати) в заданій валюті.
-    func expectedBalance(monthlyBudget: Double, for transactions: FetchedResults<Transaction>, in targetCurrency: String, using currencyManager: CurrencyManager) -> Double {
-        let expenses = totalExpenses(for: transactions, in: targetCurrency, using: currencyManager)
-        return monthlyBudget - expenses
-    }
-    
-    /// Обчислює фактичний баланс (початковий баланс + поповнення - витрати - перекази) в заданій валюті.
-    func actualBalance(initialBalance: Double, for transactions: FetchedResults<Transaction>, in targetCurrency: String, using currencyManager: CurrencyManager) -> Double {
-        let replenishment = totalReplenishment(for: transactions, in: targetCurrency, using: currencyManager)
-        let expenses = totalExpenses(for: transactions, in: targetCurrency, using: currencyManager)
-        let transfers = totalToOtherAccount(for: transactions, in: targetCurrency, using: currencyManager)
-        return initialBalance + replenishment - expenses - transfers
-    }
-    
-    /// Обчислює середній курс транзакцій у базовій валюті.
-    func averageExchangeRate(for transactions: FetchedResults<Transaction>, baseCurrency: String, using currencyManager: CurrencyManager) -> Double {
-        let (total, count) = transactions.reduce((0.0, 0)) { (acc, transaction) -> (Double, Int) in
-            let txnCurrency = transaction.firstCurrencyCode ?? baseCurrency
-            let converted = currencyManager.convert(amount: transaction.firstAmount, from: txnCurrency, to: baseCurrency)
-            return (acc.0 + converted, acc.1 + 1)
         }
-        return count > 0 ? total / Double(count) : 0.0
+    }
+    
+    // Підрахунок поповнень
+    func totalReplenishment(for transactions: [Transaction],
+                            targetCurrency: String,
+                            currencyManager: CurrencyManager) -> Double {
+        let replenishmentTransactions = transactions.filter { $0.validCategory == "Поповнення" }
+        if targetCurrency == currencyManager.baseCurrency1 {
+            return replenishmentTransactions.reduce(0) { total, txn in
+                total + txn.firstAmount
+            }
+        } else {
+            return replenishmentTransactions.reduce(0) { total, txn in
+                total + currencyManager.convert(transaction: txn, to: targetCurrency, using: replenishmentTransactions)
+            }
+        }
+    }
+    
+    // Підрахунок транзакцій "На інший рахунок"
+    func totalToOtherAccount(for transactions: [Transaction],
+                             targetCurrency: String,
+                             currencyManager: CurrencyManager) -> Double {
+        let transferTransactions = transactions.filter { $0.validCategory == "На інший рахунок" }
+        if targetCurrency == currencyManager.baseCurrency1 {
+            return transferTransactions.reduce(0) { total, txn in
+                total + txn.firstAmount
+            }
+        } else {
+            return transferTransactions.reduce(0) { total, txn in
+                total + currencyManager.convert(transaction: txn, to: targetCurrency, using: transferTransactions)
+            }
+        }
+    }
+    
+    // Обчислення очікуваного балансу у вказаній валюті
+    func expectedBalance(budget: Double,
+                         for transactions: [Transaction],
+                         targetCurrency: String,
+                         currencyManager: CurrencyManager) -> Double {
+        let expenses = totalExpenses(for: transactions, targetCurrency: targetCurrency, currencyManager: currencyManager)
+        return budget - expenses
+    }
+    
+    // Обчислення фактичного балансу у вказаній валюті
+    func actualBalance(initialBalance: Double,
+                       for transactions: [Transaction],
+                       targetCurrency: String,
+                       currencyManager: CurrencyManager) -> Double {
+        let expenses = totalExpenses(for: transactions, targetCurrency: targetCurrency, currencyManager: currencyManager)
+        let replenishments = totalReplenishment(for: transactions, targetCurrency: targetCurrency, currencyManager: currencyManager)
+        let transfers = totalToOtherAccount(for: transactions, targetCurrency: targetCurrency, currencyManager: currencyManager)
+        return initialBalance + replenishments - expenses - transfers
+    }
+    
+    // Обчислення курсу обміну для окремої транзакції
+    func exchangeRate(for transaction: Transaction) -> Double {
+        guard transaction.secondAmount != 0 else { return 0 }
+        return transaction.firstAmount / transaction.secondAmount
+    }
+    
+    // Середній курс обміну для транзакцій певної категорії
+    func averageExchangeRateForCategory(transactions: [Transaction]) -> Double {
+        let rates = transactions.compactMap { txn -> Double? in
+            let rate = exchangeRate(for: txn)
+            return rate != 0 ? rate : nil
+        }
+        guard !rates.isEmpty else { return 0 }
+        return rates.reduce(0, +) / Double(rates.count)
+    }
+    
+    // Загальний середній курс обміну по всіх категоріях
+    func overallAverageExchangeRate(for transactions: [Transaction]) -> Double {
+        let grouped = Dictionary(grouping: transactions, by: { $0.validCategory })
+        let categoryAverages = grouped.compactMap { (_, txns) -> Double? in
+            let avg = averageExchangeRateForCategory(transactions: txns)
+            return avg != 0 ? avg : nil
+        }
+        guard !categoryAverages.isEmpty else { return 0 }
+        return categoryAverages.reduce(0, +) / Double(categoryAverages.count)
     }
 }
+
 
 // MARK: - Модель даних категорій
 final class CategoryDataModel: ObservableObject {
@@ -150,7 +233,6 @@ enum CategoryFilterType: String, CaseIterable {
     case expenses = "За витратами UAH"
 }
 
-// Допоміжна функція для іконок фільтрації
 func filterIconName(for type: CategoryFilterType) -> String {
     switch type {
     case .count: return "number"
@@ -167,8 +249,6 @@ extension Transaction {
 
 // MARK: - TransactionService (бізнес-логіка)
 struct TransactionService {
-    
-    /// Перейменування категорії у транзакціях та оновлення даних моделі категорій.
     static func renameCategory(oldName: String, newName: String, in context: NSManagedObjectContext, categoryDataModel: CategoryDataModel) {
         let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "category == %@", oldName)
@@ -191,7 +271,6 @@ struct TransactionService {
         }
     }
     
-    /// Додає транзакцію з двома парами сума–валютний код.
     static func addTransaction(firstAmount: Double, firstCurrencyCode: String,
                                secondAmount: Double, secondCurrencyCode: String,
                                selectedCategory: String, comment: String,
@@ -200,11 +279,35 @@ struct TransactionService {
         newTransaction.id = UUID()
         newTransaction.firstAmount = firstAmount
         newTransaction.firstCurrencyCode = firstCurrencyCode
-        newTransaction.secondAmount = secondAmount
-        newTransaction.secondCurrencyCode = secondCurrencyCode
         newTransaction.category = selectedCategory
         newTransaction.comment = comment
-        newTransaction.date = Date()
+        let currentDate = Date()
+        newTransaction.date = currentDate
+
+        if secondCurrencyCode != "PLN" {
+            let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+            request.predicate = NSPredicate(format: "secondCurrencyCode == %@ AND date < %@", "PLN", currentDate as CVarArg)
+            request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+            request.fetchLimit = 3
+            
+            do {
+                let results = try context.fetch(request)
+                if let prevPLNTransaction = results.first, prevPLNTransaction.secondAmount != 0 {
+                    let rate = prevPLNTransaction.firstAmount / prevPLNTransaction.secondAmount
+                    newTransaction.secondAmount = firstAmount / rate
+                } else {
+                    newTransaction.secondAmount = secondAmount
+                }
+            } catch {
+                print("Помилка отримання попередньої транзакції: \(error)")
+                newTransaction.secondAmount = secondAmount
+            }
+            // Після конвертації, присвоюємо код валюти "PLN"
+            newTransaction.secondCurrencyCode = "PLN"
+        } else {
+            newTransaction.secondAmount = secondAmount
+            newTransaction.secondCurrencyCode = "PLN"
+        }
         
         do {
             try context.save()
@@ -215,8 +318,9 @@ struct TransactionService {
             return false
         }
     }
+
     
-    /// Оновлює транзакцію з використанням нових полів.
+    // Функція оновлення транзакції
     static func updateTransaction(_ transaction: Transaction,
                                   newFirstAmount: Double,
                                   newFirstCurrencyCode: String,
@@ -224,13 +328,38 @@ struct TransactionService {
                                   newSecondCurrencyCode: String,
                                   newCategory: String,
                                   newComment: String,
+                                  transactions: [Transaction],
+                                  currencyManager: CurrencyManager,
                                   in context: NSManagedObjectContext) -> Bool {
         transaction.firstAmount = newFirstAmount
-        transaction.firstCurrencyCode = newFirstCurrencyCode
-        transaction.secondAmount = newSecondAmount
-        transaction.secondCurrencyCode = newSecondCurrencyCode
+
+        if newSecondCurrencyCode != currencyManager.baseCurrency2 {
+            // Шукаємо транзакцію з найближчою датою для конвертації
+            if let nearestTxn = currencyManager.nearestTransaction(from: newFirstCurrencyCode,
+                                                                   to: currencyManager.baseCurrency2,
+                                                                   forDate: transaction.date ?? Date(),
+                                                                   transactions: transactions),
+               nearestTxn.secondAmount != 0 {
+                let rate = nearestTxn.firstAmount / nearestTxn.secondAmount
+                transaction.secondAmount = newFirstAmount / rate
+            } else {
+                // fallback: якщо історичних даних немає, використовуємо стандартний коефіцієнт для певної валюти
+                if newFirstCurrencyCode == "USD" {
+                    let defaultRate = 4.0 // встановіть актуальний курс або отримайте його іншим способом
+                    transaction.secondAmount = newFirstAmount / defaultRate
+                } else {
+                    transaction.secondAmount = newSecondAmount
+                }
+            }
+            transaction.secondCurrencyCode = currencyManager.baseCurrency2
+        } else {
+            transaction.secondAmount = newSecondAmount
+            transaction.secondCurrencyCode = newSecondCurrencyCode
+        }
+
         transaction.category = newCategory
         transaction.comment = newComment
+
         do {
             try context.save()
             return true
@@ -239,8 +368,11 @@ struct TransactionService {
             return false
         }
     }
+
+
+
+
     
-    /// Видаляє транзакцію.
     static func deleteTransaction(_ transaction: Transaction, in context: NSManagedObjectContext) {
         context.delete(transaction)
         do {
@@ -250,62 +382,109 @@ struct TransactionService {
         }
     }
     
-    /// Функція-мапа для перетворення числового коду валюти з monobank API у рядкове представлення.
     private static func mapMonobankCurrencyCode(_ code: Int) -> String {
-            switch code {
-            case 980:
-                return "UAH"
-            case 985:
-                return "PLN"
-            case 840:
-                return "USD" // Долар
-            case 978:
-                return "EUR" // Євро
-            default:
-                return "UAH" // або інший дефолт, за потребою
-            }
+        switch code {
+        case 980:
+            return "UAH"
+        case 985:
+            return "PLN"
+        case 840:
+            return "USD"
+        case 978:
+            return "EUR"
+        default:
+            return "UAH"
         }
+    }
     
-    /// Імпортує транзакції з API з урахуванням двох сум та валютних кодів.
-    static func importAPITransactions(apiTransactions: [TransactionAPI], in context: NSManagedObjectContext) {
-            apiTransactions.forEach { apiTxn in
-                let apiUUID = UUID.uuidFromString(apiTxn.id)
-                let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
-                fetchRequest.predicate = NSPredicate(format: "id == %@", apiUUID as CVarArg)
-                
-                if let count = try? context.count(for: fetchRequest), count > 0 {
-                    return
-                }
-                
-                let newTransaction = Transaction(context: context)
-                newTransaction.id = apiUUID
-                newTransaction.firstAmount = Double(apiTxn.amount) / 100.0
-                // Використовуємо mapMonobankCurrencyCode для синхронізації коду валюти
-                newTransaction.firstCurrencyCode = mapMonobankCurrencyCode(apiTxn.currencyCode)
-                newTransaction.secondAmount = Double(apiTxn.operationAmount) / 100.0
-                newTransaction.secondCurrencyCode = mapMonobankCurrencyCode(apiTxn.currencyCode)
-                
-                newTransaction.category = "API"
-                newTransaction.comment = apiTxn.description
-                newTransaction.date = Date(timeIntervalSince1970: TimeInterval(apiTxn.time))
+    
+    // Функція імпорту API транзакцій
+    static func importAPITransactions(apiTransactions: [TransactionAPI],
+                                      in context: NSManagedObjectContext,
+                                      currencyManager: CurrencyManager) {
+        var allTransactions: [Transaction] = []
+        do {
+            let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+            allTransactions = try context.fetch(request)
+        } catch {
+            print("Помилка отримання транзакцій: \(error.localizedDescription)")
+        }
+        
+        apiTransactions.forEach { apiTxn in
+            let apiUUID = UUID.uuidFromString(apiTxn.id)
+            let fetchRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", apiUUID as CVarArg)
+            
+            if let count = try? context.count(for: fetchRequest), count > 0 {
+                return
             }
             
-            do {
-                try context.save()
-                print("API transactions imported successfully!")
-            } catch {
-                print("Error saving API transactions: \(error.localizedDescription)")
+            let newTransaction = Transaction(context: context)
+            newTransaction.id = apiUUID
+            
+            // Рахунок завжди в гривнях
+            newTransaction.firstCurrencyCode = "UAH"
+            
+            let amount = Double(apiTxn.amount) / 100.0
+            let opAmount = Double(apiTxn.operationAmount) / 100.0
+            
+            // Встановлюємо дату з API
+            newTransaction.date = Date(timeIntervalSince1970: TimeInterval(apiTxn.time))
+            
+            // Конвертація з "UAH" до базової валюти (наприклад, PLN)
+            var convertedSecondAmount: Double = 0
+            var targetCurrencyCode = ""
+            if currencyManager.baseCurrency2 != "UAH" {
+                // Шукаємо транзакцію з найближчою датою для конвертації
+                if let nearestTxn = currencyManager.nearestTransaction(from: "UAH",
+                                                                       to: currencyManager.baseCurrency2,
+                                                                       forDate: newTransaction.date ?? Date(),
+                                                                       transactions: allTransactions),
+                   nearestTxn.secondAmount != 0 {
+                    let rate = nearestTxn.firstAmount / nearestTxn.secondAmount
+                    convertedSecondAmount = amount / rate
+                } else {
+                    convertedSecondAmount = opAmount
+                }
+                targetCurrencyCode = currencyManager.baseCurrency2
+            } else {
+                convertedSecondAmount = opAmount
+                targetCurrencyCode = "UAH"
             }
+            
+            if amount > 0 {
+                newTransaction.firstAmount = amount
+                newTransaction.secondAmount = convertedSecondAmount
+                newTransaction.category = "Поповнення"
+            } else {
+                newTransaction.firstAmount = abs(amount)
+                newTransaction.secondAmount = abs(convertedSecondAmount)
+                newTransaction.category = "API"
+            }
+            
+            newTransaction.secondCurrencyCode = targetCurrencyCode
+            newTransaction.comment = apiTxn.description
         }
+        
+        do {
+            try context.save()
+            print("API transactions imported successfully!")
+        } catch {
+            print("Error saving API transactions: \(error.localizedDescription)")
+        }
+    }
+
+
+
+
+
+
 }
 
-// MARK: - API-функції для транзакцій
 extension TransactionService {
-    /// Завантаження транзакцій з monobank API та їх імпорт у Core Data.
     static func fetchAPITransactions(in context: NSManagedObjectContext) {
         let calendar = Calendar.current
         let now = Date()
-        // Отримуємо 1 число поточного місяця
         guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) else {
             print("Не вдалося визначити початок місяця")
             return
@@ -321,8 +500,10 @@ extension TransactionService {
                         let decoder = JSONDecoder()
                         decoder.keyDecodingStrategy = .convertFromSnakeCase
                         let apiTransactions = try decoder.decode([TransactionAPI].self, from: data)
-                        // Імпорт транзакцій у Core Data із встановленням категорії "API"
-                        importAPITransactions(apiTransactions: apiTransactions, in: context)
+                        // Створюємо CurrencyManager для подальшої конвертації
+                        let currencyManager = CurrencyManager()
+                        // Викликаємо імпорт з додатковим параметром currencyManager
+                        importAPITransactions(apiTransactions: apiTransactions, in: context, currencyManager: currencyManager)
                     } catch {
                         print("JSON Decode Error: \(error.localizedDescription)")
                     }
@@ -332,8 +513,8 @@ extension TransactionService {
             }
         }
     }
+
     
-    /// Видаляє всі транзакції категорії "API".
     static func deleteAllAPITransactions(in context: NSManagedObjectContext, transactions: FetchedResults<Transaction>) {
         transactions.filter { $0.validCategory == "API" }.forEach { transaction in
             context.delete(transaction)
@@ -346,22 +527,16 @@ extension TransactionService {
     }
 }
 
-// MARK: - Допоміжні функції
 
 extension UUID {
-    /// Генерує UUID на основі API id (рядка) за допомогою MD5-хешування.
     static func uuidFromString(_ string: String) -> UUID {
-        // Обчислюємо MD5-хеш з даних рядка
         let data = Data(string.utf8)
         let hash = Insecure.MD5.hash(data: data)
-        // Перетворюємо хеш у масив байтів
         var uuidBytes = Array(hash)
         
-        // Налаштовуємо байти для відповідності стандарту UUID (версія 3, варіант 1)
-        uuidBytes[6] = (uuidBytes[6] & 0x0F) | 0x30 // Версія 3
-        uuidBytes[8] = (uuidBytes[8] & 0x3F) | 0x80 // Варіант
+        uuidBytes[6] = (uuidBytes[6] & 0x0F) | 0x30
+        uuidBytes[8] = (uuidBytes[8] & 0x3F) | 0x80
         
-        // Створюємо UUID з отриманих байтів
         return uuidBytes.withUnsafeBytes { pointer in
             let bytes = pointer.bindMemory(to: uuid_t.self)
             return UUID(uuid: bytes.baseAddress!.pointee)
@@ -369,7 +544,6 @@ extension UUID {
     }
 }
 
-// MARK: - Структура для декодування транзакцій із API
 struct TransactionAPI: Codable {
     let id: String
     let time: Int
@@ -378,7 +552,7 @@ struct TransactionAPI: Codable {
     let operationAmount: Int
     let currencyCode: Int
     let balance: Int
-    let category: Int  // Це поле міститиме значення "mcc"
+    let category: Int
 
     enum CodingKeys: String, CodingKey {
         case id, time, description, amount, operationAmount, currencyCode, balance
@@ -386,7 +560,6 @@ struct TransactionAPI: Codable {
     }
 }
 
-// MARK: - Функція для тестування викликів API
 func testMonobankAPI() {
     let api = MonobankAPI()
     api.fetchClientInfo { result in
