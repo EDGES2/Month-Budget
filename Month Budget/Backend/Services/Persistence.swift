@@ -340,12 +340,7 @@ struct TransactionService {
                 let rate = nearestTxn.firstAmount / nearestTxn.secondAmount
                 transaction.secondAmount = newFirstAmount / rate
             } else {
-                if newFirstCurrencyCode == "USD" {
-                    let defaultRate = 4.0
-                    transaction.secondAmount = newFirstAmount / defaultRate
-                } else {
-                    transaction.secondAmount = newSecondAmount
-                }
+                transaction.secondAmount = newSecondAmount
             }
             transaction.secondCurrencyCode = currencyManager.baseCurrency2
         } else {
