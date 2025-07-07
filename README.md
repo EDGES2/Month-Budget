@@ -5,7 +5,7 @@ Ideą tego projektu była praktyczna nauka Swifta oraz SwiftUI. Stworzyłem tę 
 
 Oznacza to, że użytkownik wybiera jedną walutę jako główną (tę, której używa na co dzień) i drugą jako dodatkową. Jest to przydatne do śledzenia wydatków podczas pobytu w innym kraju. Aplikacja posiada wbudowany algorytm konwersji walut, który chroni przed błędami przy wydatkach w różnych walutach jednocześnie (w moim przypadku UAH, PLN, USD, EUR). Aplikacja korzysta również z API banku (Monobank).
 
-## Структура проєкту
+## Project structure
 ```
 Month Budget
 │── Month Budget
@@ -70,41 +70,34 @@ extension Text
 ```
 
 ---
-Позначення:
-- `~` означає, що структура використовується у багатьох головних структурах.
-- `''` означає, що структура використовується в одній головній структурі, але також у її підструктурі.
 
+**Legend:**
+- `~` means that the structure is used in many main structures.
+- `''` means that the structure is used in one main structure, but also in its substructure.
 
-
+---
 
 git push -f origin HEAD
 /usr/libexec/PlistBuddy -c "Add :MonobankToken string 'your-secret-token'" Config.plist
 
-Опис імпортованих даних з Monobank API
-Інформація про рахунок (/personal/client-info)
+---
 
-Ім'я клієнта (name): ПІБ власника рахунку.
+### Description of imported data from Monobank API
 
-Ідентифікатор клієнта (clientId): Унікальний ідентифікатор користувача.
+**Account Information (`/personal/client-info`)**
 
-Баланс рахунку (balance): Поточний баланс рахунку в копійках.
+* **Client Name** (`name`): Full name of the account holder.
+* **Client ID** (`clientId`): Unique user identifier.
+* **Account Balance** (`balance`): Current account balance in kopecks.
+* **Account Types** (`accounts`): An array of objects with account details (currency, number, etc.).
 
-Типи рахунків (accounts): Масив об'єктів із деталями про рахунки (валюта, номер тощо).
+**Transaction List (`/personal/statement/{account}/{from}/{to}`)**
 
+* **Transaction ID** (`id`): Unique transaction identifier.
+* **Transaction Time** (`time`): UNIX timestamp of the transaction.
+* **Transaction Description** (`description`): Information about the payment (e.g., store name).
+* **Transaction Amount** (`amount`): The amount of the transaction in kopecks (a negative value for expenses).
+* **Currency Code** (`currencyCode`): ISO 4217 currency code (e.g., 980 for UAH).
+* **Balance After Transaction** (`balance`): The account balance after the transaction.
+* **Transaction Category** (`mcc`): Merchant Category Code.
 
-
-Список транзакцій (/personal/statement/{account}/{from}/{to})
-
-ID транзакції (id): Унікальний ідентифікатор операції.
-
-Час транзакції (time): UNIX timestamp моменту здійснення операції.
-
-Опис операції (description): Інформація про платіж (наприклад, назва магазину).
-
-Сума операції (amount): Розмір операції у копійках (від’ємне значення для витрат).
-
-Код валюти (currencyCode): ISO 4217 код валюти (наприклад, 980 – UAH).
-
-Залишок після операції (balance): Баланс рахунку після здійснення операції.
-
-Категорія транзакції (mcc): Код категорії торгової точки (Merchant Category Code).
