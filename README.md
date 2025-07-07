@@ -1,6 +1,6 @@
 # Month Budget
 
-## Opisanie dla CV
+## Opis do CV
 Ideą tego projektu była praktyczna nauka Swifta oraz SwiftUI. Stworzyłem tę aplikację na własne potrzeby, aby śledzić swój budżet. Nie jest jeszcze ukończona, ale obsługuje już tryb dwóch walut.
 
 Oznacza to, że użytkownik wybiera jedną walutę jako główną (tę, której używa na co dzień) i drugą jako dodatkową. Jest to przydatne do śledzenia wydatków podczas pobytu w innym kraju. Aplikacja posiada wbudowany algorytm konwersji walut, który chroni przed błędami przy wydatkach w różnych walutach jednocześnie (w moim przypadku UAH, PLN, USD, EUR). Aplikacja korzysta również z API banku (Monobank).
