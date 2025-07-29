@@ -18,7 +18,7 @@ struct BudgetSummaryView: View {
     @State private var showCalendarSheet: Bool = false
     @State private var selectedDate: Date = Date()
 
-    private let initialBalance: Double = 29703.54
+    private let initialBalance: Double = 24251.67
 
     private var currencyManager: CurrencyManager {
         CurrencyManager(currencyDataModel: currencyDataModel)
@@ -248,16 +248,16 @@ private extension BudgetSummaryView {
                 VStack(alignment: .center, spacing: 12) {
                     InputField(title: "Сума", text: $firstAmount)
                     Picker("Валюта", selection: $firstCurrencyCode) {
-                        ForEach(Array(currencyManager.currencies.keys), id: \.self) { code in
-                            Text(currencyManager.currencies[code]?.symbol ?? code)
+                        ForEach(Array(currencyManager.currencies.keys.sorted()), id: \.self) { code in
+                           Text(currencyManager.currencies[code]?.symbol ?? code).tag(code)
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
 
-                    InputField(title: "Сума", text: $secondAmount)
+                    InputField(title: "Сума у другій валюті (необов'язково)", text: $secondAmount)
                     Picker("Валюта", selection: $secondCurrencyCode) {
-                        ForEach(Array(currencyManager.currencies.keys), id: \.self) { code in
-                           Text(currencyManager.currencies[code]?.symbol ?? code)
+                        ForEach(Array(currencyManager.currencies.keys.sorted()), id: \.self) { code in
+                           Text(currencyManager.currencies[code]?.symbol ?? code).tag(code)
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
@@ -278,11 +278,13 @@ private extension BudgetSummaryView {
         }
 
         private func addTransaction() {
-            guard let firstAmt = Double(firstAmount),
-                  let secondAmt = Double(secondAmount) else {
-                print("Невірний формат суми")
+            guard let firstAmt = Double(firstAmount), !firstAmount.isEmpty else {
+                print("Невірний формат першої суми")
                 return
             }
+            
+            // Якщо друге поле порожнє, передаємо 0.0
+            let secondAmt = Double(secondAmount) ?? 0.0
 
             let success = TransactionService.addTransaction(
                 firstAmount: firstAmt,
@@ -295,9 +297,6 @@ private extension BudgetSummaryView {
                 in: viewContext
             )
             if success {
-                firstAmount = ""
-                secondAmount = ""
-                comment = ""
                 closeView()
             }
         }

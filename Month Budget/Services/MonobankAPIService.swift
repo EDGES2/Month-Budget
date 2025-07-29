@@ -154,8 +154,11 @@ struct MonobankAPIService {
 
 struct Config {
     static func getToken() -> String? {
-        // ... (Цей метод має бути реалізовано для отримання токену, наприклад з plist)
-        // Для прикладу повертаємо nil, щоб уникнути помилки компіляції
-        return nil
+        guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
+              let dict = NSDictionary(contentsOfFile: path) as? [String: Any] else {
+            print("Помилка: Не вдалося знайти або завантажити Config.plist")
+            return nil
+        }
+        return dict["MonobankToken"] as? String
     }
 }
