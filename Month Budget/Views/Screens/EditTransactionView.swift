@@ -1,4 +1,3 @@
-// Month Budget/Views/Screens/EditTransactionView.swift
 import SwiftUI
 import CoreData
 
@@ -37,7 +36,7 @@ struct EditTransaction: View {
                 currencyPickerSection(title: "Перша валюта:", selection: $selectedFirstCurrency)
                 inputSection(title: "Перша сума:", text: $editedFirstAmount)
                 currencyPickerSection(title: "Друга валюта:", selection: $selectedSecondCurrency)
-                inputSection(title: "Друга сума:", text: $editedSecondAmount)
+                inputSection(title: "Друга сума (необов'язково):", text: $editedSecondAmount)
                 categoryPickerSection
                 inputSection(title: "Коментар:", text: $editedComment)
                 Spacer()
@@ -74,8 +73,8 @@ struct EditTransaction: View {
             Text(title)
                 .font(.headline)
             Picker("", selection: selection) {
-                ForEach(Array(currencyManager.currencies.keys), id: \.self) { code in
-                    Text(currencyManager.currencies[code]?.symbol ?? code)
+                ForEach(Array(currencyManager.currencies.keys.sorted()), id: \.self) { code in
+                    Text(currencyManager.currencies[code]?.symbol ?? code).tag(code)
                 }
             }
             .pickerStyle(MenuPickerStyle())
@@ -100,17 +99,10 @@ struct EditTransaction: View {
     }
     
     private func saveChanges() {
-        guard let firstAmt = Double(editedFirstAmount),
-              let secondAmt = Double(editedSecondAmount) else { return }
+        guard let firstAmt = Double(editedFirstAmount), !editedFirstAmount.isEmpty else { return }
         
-        let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
-        var transactionsArray: [Transaction] = []
-        do {
-            transactionsArray = try viewContext.fetch(request)
-        } catch {
-            print("Помилка отримання транзакцій: \(error.localizedDescription)")
-        }
-        
+        let secondAmt = Double(editedSecondAmount) ?? 0.0
+
         let success = TransactionService.updateTransaction(
             transaction,
             newFirstAmount: firstAmt,
@@ -119,7 +111,6 @@ struct EditTransaction: View {
             newSecondCurrencyCode: selectedSecondCurrency,
             newCategory: selectedCategory,
             newComment: editedComment,
-            transactions: transactionsArray,
             currencyManager: currencyManager,
             in: viewContext
         )

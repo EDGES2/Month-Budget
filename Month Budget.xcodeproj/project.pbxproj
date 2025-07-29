@@ -8,10 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		44667CB62D8DC4EB00DCF902 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 44667CB52D8DC4E100DCF902 /* README.md */; };
-		446983472D99BCB80090416A /* Currency+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446983442D99BCB80090416A /* Currency+CoreDataProperties.swift */; };
-		446983482D99BCB80090416A /* Currency+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446983432D99BCB80090416A /* Currency+CoreDataClass.swift */; };
-		446983492D99BCB80090416A /* Transaction+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446983452D99BCB80090416A /* Transaction+CoreDataClass.swift */; };
-		4469834A2D99BCB80090416A /* Transaction+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446983462D99BCB80090416A /* Transaction+CoreDataProperties.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,10 +29,6 @@
 
 /* Begin PBXFileReference section */
 		44667CB52D8DC4E100DCF902 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		446983432D99BCB80090416A /* Currency+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Currency+CoreDataClass.swift"; sourceTree = "<group>"; };
-		446983442D99BCB80090416A /* Currency+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Currency+CoreDataProperties.swift"; sourceTree = "<group>"; };
-		446983452D99BCB80090416A /* Transaction+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Transaction+CoreDataClass.swift"; sourceTree = "<group>"; };
-		446983462D99BCB80090416A /* Transaction+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Transaction+CoreDataProperties.swift"; sourceTree = "<group>"; };
 		44910D092D8072C900AF8397 /* Month Budget.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Month Budget.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		44910D1F2D8072CB00AF8397 /* Month BudgetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Month BudgetTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		44910D292D8072CB00AF8397 /* Month BudgetUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Month BudgetUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,10 +80,6 @@
 		44910D002D8072C800AF8397 = {
 			isa = PBXGroup;
 			children = (
-				446983432D99BCB80090416A /* Currency+CoreDataClass.swift */,
-				446983442D99BCB80090416A /* Currency+CoreDataProperties.swift */,
-				446983452D99BCB80090416A /* Transaction+CoreDataClass.swift */,
-				446983462D99BCB80090416A /* Transaction+CoreDataProperties.swift */,
 				44910D0B2D8072C900AF8397 /* Month Budget */,
 				44910D222D8072CB00AF8397 /* Month BudgetTests */,
 				44910D2C2D8072CB00AF8397 /* Month BudgetUITests */,
@@ -254,10 +242,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				446983472D99BCB80090416A /* Currency+CoreDataProperties.swift in Sources */,
-				446983482D99BCB80090416A /* Currency+CoreDataClass.swift in Sources */,
-				446983492D99BCB80090416A /* Transaction+CoreDataClass.swift in Sources */,
-				4469834A2D99BCB80090416A /* Transaction+CoreDataProperties.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -419,8 +403,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"/Users/kirilltokarev/Programming/XCode/Me/Month Budget/Month Budget/Frontend/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = FR2D8V694D;
+				DRIVERKIT_DEPLOYMENT_TARGET = 20.4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
@@ -447,8 +432,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"/Users/kirilltokarev/Programming/XCode/Me/Month Budget/Month Budget/Frontend/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = FR2D8V694D;
+				DRIVERKIT_DEPLOYMENT_TARGET = 20.4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";

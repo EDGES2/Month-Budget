@@ -1,30 +1,10 @@
 // Month Budget/Services/MonobankAPIService.swift
 import Foundation
 import CoreData
-import CryptoKit
 
 struct MonobankAPIService {
     private let token = Config.getToken() ?? ""
     private let baseURL = "https://api.monobank.ua"
-    
-    func fetchClientInfo(completion: @escaping (Result<Data, Error>) -> Void) {
-        let url = URL(string: "\(baseURL)/personal/client-info")!
-        var request = URLRequest(url: url)
-        request.setValue(token, forHTTPHeaderField: "X-Token")
-        request.httpMethod = "GET"
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-            } else if let httpResponse = response as? HTTPURLResponse, let data = data {
-                print("Status code:", httpResponse.statusCode)
-                completion(.success(data))
-            } else {
-                let noDataError = NSError(domain: "MonobankAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data in response"])
-                completion(.failure(noDataError))
-            }
-        }.resume()
-    }
     
     func fetchTransactions(from: TimeInterval, to: TimeInterval, completion: @escaping (Result<[APITransaction], Error>) -> Void) {
         let url = URL(string: "\(baseURL)/personal/statement/0/\(Int(from))/\(Int(to))")!
@@ -139,11 +119,9 @@ struct MonobankAPIService {
 
         do {
             let apiTransactions = try context.fetch(fetchRequest)
-
             for transaction in apiTransactions {
                 context.delete(transaction)
             }
-
             try context.save()
             print("Успішно видалено \(apiTransactions.count) API транзакцій.")
         } catch {
@@ -154,8 +132,11 @@ struct MonobankAPIService {
 
 struct Config {
     static func getToken() -> String? {
-        // ... (Цей метод має бути реалізовано для отримання токену, наприклад з plist)
-        // Для прикладу повертаємо nil, щоб уникнути помилки компіляції
-        return nil
+        guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
+              let dict = NSDictionary(contentsOfFile: path) as? [String: Any] else {
+            print("Помилка: Не вдалося знайти або завантажити Config.plist")
+            return nil
+        }
+        return dict["MonobankToken"] as? String
     }
 }
