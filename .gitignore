@@ -1,0 +1,22 @@
+# macOS System Files
+.DS_Store
+
+# Xcode Build Artifacts
+# These are generated during the build process
+Build/
+DerivedData/
+
+# Xcode User-Specific Files
+# These store your personal workspace settings, like open files and window positions
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager
+# Caches and build products for any Swift packages you might add
+.build/
+.swiftpm/
+
+# Custom Project Files
+Month\ Budget/Application/Config.plist
