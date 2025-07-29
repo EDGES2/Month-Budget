@@ -19,7 +19,7 @@ extension AppView {
         @State private var showCalendarSheet: Bool = false
         @State private var selectedDate: Date = Date()
 
-        private let initialBalance: Double = 29703.54
+        private let initialBalance: Double = 33657.94
 
         private var currencyManager: CurrencyManager {
             CurrencyManager(currencyDataModel: currencyDataModel)
